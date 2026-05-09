@@ -455,5 +455,194 @@ MODELLING STRATEGY:
     - Initial SoC for 2025 optimisation: 50% = 8 kWh
 
 ======================================================================
-[END OF REPORT — last updated after PDF analysis & data processing]
+[15] ORGANIZER CLARIFICATIONS (POST-BRIEF UPDATE)
+======================================================================
+
+--- 15.1  SITE LOCATION REVEALED ---
+
+  Location: Sondrio, Lombardy, Italy (Alpine region, northern Italy)
+  Coordinates: approx. 46.17°N, 9.87°E, elevation ~307m
+
+  WHY THIS MATTERS:
+    - Sondrio sits in the Valtellina valley in the Alps. It has a
+      continental Alpine climate: cold winters (heavy snow possible),
+      warm-to-hot summers, high solar irradiance in summer due to
+      altitude and clear skies, but significant shading/cloud in winter.
+    - External weather data (temperature, GHI solar irradiance) for
+      Sondrio can be sourced and used as additional model features.
+      Temperature improves load forecasts for thermally sensitive homes.
+      Irradiance improves PV generation estimates which correlate with load.
+    - For the Day 2 surprise dataset (different site), the location will
+      likely also be in Italy. Models using only calendar + lag features
+      will generalise better than models using site-specific weather.
+
+  ACTION: Consider fetching hourly temperature data for Sondrio 2024
+  from Open-Meteo (free, no API key) as an additional training feature.
+
+--- 15.2  FORECAST AND OPTIMIZATION SCOPE (CRITICAL CHANGE) ---
+
+  PREVIOUSLY ASSUMED: Full year 2025 forecast + full year optimization.
+  CONFIRMED BY ORGANIZER: Only two specific months.
+
+  TARGET MONTHS: April 2025 AND September 2025
+    - April 2025  : 30 days × 96 steps = 2,880 timesteps
+    - September 2025: 30 days × 96 steps = 2,880 timesteps
+    - Total evaluation window: 5,760 timesteps
+
+  !! DISCREPANCY NOTE !!
+    The user's message mentioned "February and September" but the
+    organizer's quoted text says "Apr, Sep 2025" which also matches
+    the hackathon presentation slides. ASSUME April + September
+    until confirmed otherwise. If February is correct, update here.
+
+  WHY APRIL AND SEPTEMBER ARE INTERESTING MONTHS:
+    April 2025:
+      - Spring transition month — PV ramping up, moderate load
+      - Mix of F1/F2/F3 price bands with changing solar surplus
+      - Battery strategy shifts mid-month as PV increases
+      - Good test of model generalisation across a changing season
+
+    September 2025:
+      - Autumn transition — PV declining, load rising toward winter
+      - High PV in early September, lower by end of month
+      - Challenging because seasonal regime changes within the month
+      - Evening load rises as days get shorter (more F2 exposure)
+
+  IMPACT ON BASELINE BILL:
+    The previously computed full-year 2025 Baseline A bill (EUR 1,218.97)
+    is NOT the submission target. We must recompute it for Apr + Sep only.
+    Estimated Apr+Sep share: ~(60 days / 365 days) × EUR 1,218.97 ≈ EUR 200
+    (rough estimate — actual computation needed from processed CSV)
+
+--- 15.3  SOC INITIAL CONDITIONS (CRITICAL CHANGE) ---
+
+  PREVIOUSLY ASSUMED: Single SoC=50% at Jan 1 2025, continuous run.
+  CONFIRMED BY ORGANIZER: Independent reset at the start of EACH month.
+
+  APRIL 2025 OPTIMIZATION:
+    - Start: April 1 2025 00:00, SoC = 50% = 8.0 kWh
+    - End:   April 30 2025 23:45
+    - Run optimizer continuously for all 2,880 steps
+    - SoC trajectory reconstructed entirely from optimizer output
+
+  SEPTEMBER 2025 OPTIMIZATION:
+    - Start: September 1 2025 00:00, SoC = 50% = 8.0 kWh
+    - End:   September 30 2025 23:45
+    - Run optimizer continuously for all 2,880 steps
+    - SoC trajectory reconstructed entirely from optimizer output
+
+  WHY THIS MATTERS:
+    - The two months are independent problems — an error in April does
+      not carry into September. This is fair and realistic.
+    - SoC reconstruction must use ONLY the optimizer's own battery
+      decisions, NOT the raw p_battery_kw column from the dataset.
+    - Formula: SoC(t+1) = SoC(t) - P_battery(t) × 0.25 / eff
+      where eff = √0.90 if discharging, √0.90 if charging (per direction)
+    - Final SoC at end of month is free (no terminal constraint).
+
+--- 15.4  NO 2025 DATA IN TRAINING (STRICT RULE) ---
+
+  RULE: 2025 data is completely forbidden during model training and tuning.
+  This includes: feature engineering, hyperparameter selection, validation.
+
+  IMPLICATION FOR TRAIN/VALIDATION SPLIT:
+    - All model development must use 2024 data only.
+    - Recommended validation strategy within 2024:
+        Option A (preferred): Use 2024 April + September as proxy
+          validation months (mirror the test months). Train on all
+          other 2024 months (Jan-Mar, May-Aug, Oct-Dec).
+          This gives the most honest estimate of performance on
+          the exact seasonal windows being tested.
+        Option B: Walk-forward CV — train on Jan-Aug 2024,
+          validate on Sep-Dec 2024. Simple and leak-free.
+        Option C: Blocked k-fold by month — 12 folds, each fold
+          holds out one month. More robust but slower.
+    - Do NOT use any 2025 timestamps even for computing
+      normalisation statistics (mean, std, min, max).
+      Compute all statistics from 2024 training data only.
+
+  IMPLICATION FOR FEATURES:
+    - Lag features are computed from the TRAINING window only.
+      When predicting April 2025, lags reaching back into March 2025
+      are available (since the test input includes all 2025 data up
+      to the prediction point). This is fine — we are not training
+      on 2025, just using the 2025 context window as input.
+    - This is the standard "causal" time series setup.
+
+--- 15.5  REVISED BILL COMPUTATION FOR SUBMISSION ---
+
+  The submission compares bills for April + September 2025 only.
+  NOTE: The discrepancy note about "February" in section 15.2 is now
+  resolved — confirmed by user that the correct months are APRIL + SEPTEMBER.
+
+  COMPUTED BASELINE BILLS (Apr + Sep 2025):
+
+  Baseline A — Existing on-site controller (actual p_battery_kw):
+    April 2025    : Import EUR 8.75  | Export EUR 18.10 | Net = EUR -9.35
+    September 2025: Import EUR 14.35 | Export EUR 12.57 | Net = EUR +1.79
+    TOTAL         : EUR -7.57  (the site is a net earner in these months!)
+
+  Baseline B — Zero intelligence (no battery, PV-first):
+    April 2025    : Import EUR 65.60 | Export EUR 39.73 | Net = EUR +25.87
+    September 2025: Import EUR 78.78 | Export EUR 35.91 | Net = EUR +42.87
+    TOTAL         : EUR +68.74
+
+  Battery value vs no battery: EUR 76.31 savings (Baseline A vs B)
+
+  !! CRITICAL INSIGHT !!
+    Baseline A is already NEGATIVE (EUR -7.57). The existing controller
+    earns more from solar exports than it spends on imports in these two
+    months combined. This means:
+      - Our optimizer must achieve a bill MORE negative than -7.57
+      - i.e., earn even more from exports or avoid even more imports
+      - The competition is about squeezing additional cents out of an
+        already well-optimized system — margin for improvement is tighter
+        than expected
+      - April is where the existing controller shines (already -9.35)
+      - September (1.79) is where there is more room to improve
+
+  FORMULA for all bill computations:
+    Bill = Σ [ grid_kw(t) × buy_price(t) × 0.25 × 1(import)
+             − |grid_kw(t)| × sell_price(t) × 0.25 × 1(export) ]
+    where 1(import) = 1 if grid_kw > 0, else 0
+          1(export) = 1 if grid_kw < 0, else 0
+
+  Your controller: same formula but with YOUR optimizer's battery decisions.
+  Oracle: same formula but using ACTUAL 2025 load (perfect forecast).
+
+  Required outputs in final presentation:
+    - Baseline A bill (EUR) for Apr+Sep 2025 : EUR -7.57
+    - Baseline B bill (EUR) for Apr+Sep 2025 : EUR +68.74
+    - Your controller bill (EUR) for Apr+Sep 2025
+    - Savings vs Baseline A: EUR and %
+    - Savings vs Baseline B: EUR and %
+    - Oracle bill (EUR) and oracle gap (EUR and %)
+    - Dispatch plot: Week 3 of March 2025 (load, PV, battery, grid, SoC)
+      NOTE: March plot is in the brief but optimization is Apr+Sep.
+      The March plot is for visual verification only.
+
+--- 15.6  UPDATED MODELLING STRATEGY (FINAL) ---
+
+  FORECASTING:
+    - Train: 2024 data ONLY (all 2024 except proxy validation months)
+    - Validate: 2024 April + September (proxy for test months)
+    - Test (report metrics): April 2025 + September 2025
+    - Features: lag_1, lag_4, lag_96, lag_672, rolling means,
+      Fourier(hour), Fourier(day-of-year), month, tariff_band,
+      is_holiday, net_load_lag (pv_kw - load_kw, lagged)
+    - Optional: external temperature for Sondrio (Open-Meteo API)
+    - No 2025 data for any normalization or tuning
+
+  OPTIMIZATION:
+    - Scope: April 2025 (SoC_0=50%) and September 2025 (SoC_0=50%)
+    - Input: your load forecast + known PV actuals + known prices
+    - Method: rolling-horizon MPC, step-by-step, causal
+    - Test horizons H: 4 steps (1h), 24 steps (6h), 96 steps (24h)
+      for Extension 1
+    - Output: P_battery(t) for every timestep → reconstruct SoC
+    - Constraints: SoC ∈ [0,1], battery ±8kW, grid ±6kW,
+      efficiency √0.90 per direction
+
+======================================================================
+[END OF REPORT — last updated after organizer clarification]
 ======================================================================
