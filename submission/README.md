@@ -1,12 +1,10 @@
 # Solship Energy AI Hackathon 2026 — Submission
 
-**Team**: AhmedBayoumi
-**Site**: Sondrio, Italy (residential, 9 kWp PV, 16 kWh / ±8 kW battery, ±6 kW grid)
-**Test window**: April 2025 + September 2025
+**Team**: Ahmed Moahmed Bayoumi
 
 ---
 
-## 🏆 Headline Results
+## Headline Results
 
 | Metric                                                    | Value          |
 |-----------------------------------------------------------|----------------|
