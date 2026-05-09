@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Solship Hackathon — Deep EDA Report</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f6f9; color: #1a1a2e; line-height: 1.7; }
+  .header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); color: white; padding: 48px 60px; }
+  .header h1 { font-size: 2.4em; font-weight: 700; margin-bottom: 8px; }
+  .header p { font-size: 1.1em; opacity: 0.8; }
+  .header .meta { display: flex; gap: 32px; margin-top: 24px; }
+  .header .meta-item { background: rgba(255,255,255,0.1); border-radius: 8px; padding: 10px 18px; font-size: 0.9em; }
+  .header .meta-item span { display: block; font-size: 1.4em; font-weight: 700; }
+  .toc { background: white; margin: 32px 60px; border-radius: 12px; padding: 28px 36px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+  .toc h2 { font-size: 1.1em; font-weight: 700; color: #0f3460; margin-bottom: 14px; text-transform: uppercase; letter-spacing: 1px; }
+  .toc ol { padding-left: 20px; columns: 2; gap: 32px; }
+  .toc li { margin-bottom: 6px; font-size: 0.95em; }
+  .toc a { color: #0f3460; text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .section { background: white; margin: 0 60px 32px; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+  .section-header { background: #0f3460; color: white; padding: 18px 32px; display: flex; align-items: center; gap: 14px; }
+  .section-header .num { background: rgba(255,255,255,0.2); width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.95em; flex-shrink: 0; }
+  .section-header h2 { font-size: 1.2em; font-weight: 600; }
+  .section-body { padding: 28px 32px; }
+  .plot-container { text-align: center; margin: 22px 0; }
+  .plot-container img { max-width: 100%; border-radius: 8px; border: 1px solid #e8ecf0; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  .plot-caption { font-size: 0.82em; color: #666; margin-top: 8px; font-style: italic; }
+  .finding { background: #f0f4ff; border-left: 4px solid #0f3460; border-radius: 0 8px 8px 0; padding: 14px 18px; margin: 16px 0; }
+  .finding.warning { background: #fff8e1; border-left-color: #f59e0b; }
+  .finding.success { background: #e8f5e9; border-left-color: #22c55e; }
+  .finding.danger  { background: #ffeaea; border-left-color: #ef4444; }
+  .finding strong { display: block; margin-bottom: 4px; font-size: 0.95em; }
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin: 18px 0; }
+  .stat-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 16px; text-align: center; }
+  .stat-card .val { font-size: 1.6em; font-weight: 700; color: #0f3460; }
+  .stat-card .lbl { font-size: 0.78em; color: #64748b; margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 16px 0; }
+  .insight-box { background: #1a1a2e; color: #e2e8f0; border-radius: 10px; padding: 22px 26px; margin: 20px 0; }
+  .insight-box h3 { color: #60a5fa; font-size: 1em; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; }
+  .insight-box ul { padding-left: 18px; }
+  .insight-box li { margin-bottom: 6px; font-size: 0.93em; }
+  .tag { display: inline-block; background: #dbeafe; color: #1e40af; border-radius: 4px; padding: 2px 8px; font-size: 0.78em; font-weight: 600; margin-right: 4px; }
+  .tag.orange { background: #ffedd5; color: #c2410c; }
+  .tag.green  { background: #dcfce7; color: #15803d; }
+  .tag.red    { background: #fee2e2; color: #b91c1c; }
+  h3 { color: #1e3a5f; font-size: 1.05em; margin: 20px 0 8px; }
+  p { margin-bottom: 12px; font-size: 0.95em; }
+  ul, ol { padding-left: 20px; margin-bottom: 12px; font-size: 0.95em; }
+  li { margin-bottom: 5px; }
+  .summary-section { background: linear-gradient(135deg, #1a1a2e, #0f3460); color: white; margin: 0 60px 32px; border-radius: 12px; padding: 36px 40px; }
+  .summary-section h2 { font-size: 1.5em; margin-bottom: 20px; }
+  .action-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-top: 20px; }
+  .action-card { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 18px 20px; }
+  .action-card h4 { color: #60a5fa; margin-bottom: 10px; font-size: 0.95em; text-transform: uppercase; letter-spacing: 0.5px; }
+  .action-card ul { padding-left: 16px; font-size: 0.88em; color: #cbd5e1; }
+  .action-card li { margin-bottom: 5px; }
+  footer { text-align: center; padding: 24px; color: #64748b; font-size: 0.85em; margin-bottom: 20px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Solship Hackathon — Deep EDA Report</h1>
+  <p>Residential Energy System: Load Forecasting &amp; Battery Dispatch Optimisation</p>
+  <div class="meta">
+    <div class="meta-item">Total Rows<span>70,077</span></div>
+    <div class="meta-item">Resolution<span>15 min</span></div>
+    <div class="meta-item">Train Year<span>2024</span></div>
+    <div class="meta-item">Test Year<span>2025</span></div>
+    <div class="meta-item">Plots Generated<span>18</span></div>
+  </div>
+</div>
+
+<div class="toc">
+  <h2>Table of Contents</h2>
+  <ol>
+    <li><a href="#s1">Dataset Overview</a></li>
+    <li><a href="#s2">Full Time Series Overview</a></li>
+    <li><a href="#s3">Load Distribution</a></li>
+    <li><a href="#s4">Hourly Load Profile</a></li>
+    <li><a href="#s5">Day-of-Week Load Profile</a></li>
+    <li><a href="#s6">Monthly Load Profile</a></li>
+    <li><a href="#s7">Load Heatmap: Hour × Day-of-Week</a></li>
+    <li><a href="#s8">Load Heatmap: Hour × Month</a></li>
+    <li><a href="#s9">Year-over-Year Daily Load</a></li>
+    <li><a href="#s10">PV Hourly Generation Profile</a></li>
+    <li><a href="#s11">PV Monthly Generation Profile</a></li>
+    <li><a href="#s12">Net Load Analysis</a></li>
+    <li><a href="#s13">Battery &amp; Grid Analysis</a></li>
+    <li><a href="#s14">Electricity Price Analysis</a></li>
+    <li><a href="#s15">Correlation Matrix</a></li>
+    <li><a href="#s16">Load Anomaly Detection</a></li>
+    <li><a href="#s17">Autocorrelation (ACF/PACF)</a></li>
+    <li><a href="#s18">Spectral Analysis</a></li>
+    <li><a href="#s19">Feature Importance</a></li>
+    <li><a href="#summary">Key Findings &amp; Modelling Strategy</a></li>
+  </ol>
+</div>
+
+
+<!-- ─── SECTION 1 ─────────────────────────────────────────────────────────── -->
+<div class="section" id="s1">
+  <div class="section-header"><div class="num">1</div><h2>Dataset Overview</h2></div>
+  <div class="section-body">
+    <p>The dataset covers a full two-year period of a residential energy system at 15-minute resolution, providing 70,077 timesteps. It contains six columns describing the energy flows at each moment in time.</p>
+
+    <div class="stats-grid">
+      <div class="stat-card"><div class="val">70,077</div><div class="lbl">Total rows</div></div>
+      <div class="stat-card"><div class="val">35,136</div><div class="lbl">Train rows (2024)</div></div>
+      <div class="stat-card"><div class="val">34,941</div><div class="lbl">Test rows (2025)</div></div>
+      <div class="stat-card"><div class="val">6</div><div class="lbl">Columns</div></div>
+      <div class="stat-card"><div class="val">8</div><div class="lbl">Missing values (price only)</div></div>
+      <div class="stat-card"><div class="val">2</div><div class="lbl">Timestamp gaps (DST)</div></div>
+    </div>
+
+    <h3>Columns</h3>
+    <ul>
+      <li><strong>load_p</strong>: Residential electrical demand in kW. This is our <em>forecast target</em>. Always ≥ 0. Mean: 1.49 kW, Max: 9.44 kW.</li>
+      <li><strong>pv_p</strong>: Solar PV generation in kW. Always ≥ 0, zero at night. Max: 8.55 kW.</li>
+      <li><strong>battery_p</strong>: Battery power in kW. Positive = discharging (supplying load), Negative = charging (storing energy). Range: −5.08 to +5.02 kW.</li>
+      <li><strong>grid_p</strong>: Grid power in kW. Positive = importing from grid, Negative = exporting to grid. Range: −5.92 to +9.09 kW.</li>
+      <li><strong>Selling_price_eur_kwh</strong>: The dynamic electricity price in €/kWh. This is both the buying and selling price. Mean: 0.112 €/kWh, Max: 0.289 €/kWh.</li>
+      <li><strong>timestamp</strong>: CET/CEST datetime index at 15-min intervals.</li>
+    </ul>
+
+    <h3>Data Quality</h3>
+    <div class="finding success"><strong>Near-perfect completeness.</strong> Zero missing values in all physical measurements (load, PV, battery, grid). Only 8 missing price values at DST clock-change transitions (March 31 2024 and March 30 2025, 23:00–23:45). These are trivially filled by forward-fill.</div>
+    <div class="finding warning"><strong>DST gaps in timestamp.</strong> Two 1-hour gaps exist where clocks jump forward (23:00 → 00:15 directly). These are expected and not sensor errors — they represent real missing clock time, not missing sensor readings.</div>
+    <div class="finding danger"><strong>2024 energy balance corruption.</strong> Theoretically, load = grid + battery + PV at every timestep. In 2024, the max imbalance reaches 0.68 kW (vs only 0.02 kW in 2025). This confirms the battery sensor corruption mentioned in the problem brief — some 2024 battery_p readings are inaccurate. For battery SoC reconstruction in 2024, we must use energy balance rather than raw battery_p values.</div>
+  </div>
+</div>
+
+
+<!-- ─── SECTION 2 ─────────────────────────────────────────────────────────── -->
+<div class="section" id="s2">
+  <div class="section-header"><div class="num">2</div><h2>Plot 1 — Full Time Series Overview (All Variables)</h2></div>
+  <div class="section-body">
+    <div class="plot-container">
+      <img src="../plots/01_full_timeseries.png" alt="Full Time Series">
+      <div class="plot-caption">Figure 1: All five variables plotted across the full 2-year period (Jan 2024 – Dec 2025).</div>
+    </div>
+
+    <p>This bird's-eye view shows two complete years of data stacked vertically. Each panel reveals a different dimension of the energy system's behaviour over time.</p>
+
+    <h3>Load (top panel, blue)</h3>
+    <p>Load shows spiky, high-variance behaviour throughout the year. The dense vertical lines represent the rapid within-day fluctuations (morning rise, midday peak, evening activity). Visually, there is <strong>no dramatic seasonal pattern in load magnitude</strong> — the variance looks fairly consistent year-round, with a slight elevation in winter months (Dec–Jan). This tells us the household does not have heavy air conditioning that would spike summer load.</p>
+
+    <h3>Grid (orange)</h3>
+    <p>Grid power shows pronounced seasonal variation. Notice the <strong>wide downward swings in summer</strong> (Apr–Sep) — these are export events when PV generation far exceeds consumption. In winter, the grid is almost always importing (positive). The system is clearly net-exporting in summer and net-importing in winter.</p>
+
+    <h3>Battery (green)</h3>
+    <p>Battery shows consistent bidirectional activity throughout the year with no obvious seasonal bias in magnitude. The battery cycles daily. Notice the amplitude appears slightly larger in summer — consistent with more PV to charge from. The 2024 period shows some abnormal dense activity (the corrupted sensor readings).</p>
+
+    <h3>PV (golden)</h3>
+    <p>PV shows the clearest seasonal signal of all variables: a strong sinusoidal shape with <strong>peak generation June–August and near-zero output November–January</strong>. The daily spikes within the summer months represent individual sunny days. This is the dominant driver of the energy system's behaviour.</p>
+
+    <h3>Price (purple)</h3>
+    <p>Electricity prices show a fairly stable band around 0.09–0.14 €/kWh with occasional spikes up to 0.28 €/kWh. Prices appear slightly more volatile in winter. The 2025 period (right half) has a slightly elevated baseline versus 2024 — a market-wide price increase of ~8%.</p>
+  </div>
+</div>
+
+
+<!-- ─── SECTION 3 ─────────────────────────────────────────────────────────── -->
+<div class="section" id="s3">
+  <div class="section-header"><div class="num">3</div><h2>Plot 2 — Load Distribution</h2></div>
+  <div class="section-body">
+    <div class="plot-container">
+      <img src="../plots/02_load_distribution.png" alt="Load Distribution">
+      <div class="plot-caption">Figure 2: Load histogram with KDE for 2024 (left), 2025 (middle), and both overlaid (right).</div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card"><div class="val">1.49 kW</div><div class="lbl">Mean Load 2024</div></div>
+      <div class="stat-card"><div class="val">1.14 kW</div><div class="lbl">Median Load 2024</div></div>
+      <div class="stat-card"><div class="val">9.26 kW</div><div class="lbl">Max Load 2024</div></div>
+      <div class="stat-card"><div class="val">1.04</div><div class="lbl">Skewness 2024</div></div>
+    </div>
+
+    <h3>Shape of the Distribution</h3>
+    <p>The load distribution is strongly <strong>right-skewed</strong> (skewness = 1.04 in 2024, 1.10 in 2025). This means the most common load values are relatively low (0.3–1.5 kW — baseline appliances like fridges, standby devices), but there are frequent high-demand events (cooking, EV charging, heating) that pull the mean above the median and create a long right tail.</p>
+    <p>The distribution has a clear <strong>bimodal shape</strong>: a large mode around 0.3–0.5 kW (night/idle state) and a second, broader mode around 1.5–2.5 kW (active daytime use). This bimodality is an important hint for modelling — a single Gaussian assumption would be wrong.</p>
+
+    <h3>2024 vs 2025 Comparison (right panel)</h3>
+    <p>The two distributions are nearly identical, which is excellent news. The 2025 distribution is marginally shifted rightward (2025 mean: 1.476 kW vs 2024: 1.488 kW — essentially the same household, same usage patterns). This validates that training on 2024 data will generalise well to 2025. The slight 2025 shift toward higher values at the extreme tail (max: 9.44 kW vs 9.26 kW) may indicate a new high-consumption appliance.</p>
+
+    <div class="finding success"><strong>Modelling implication:</strong> Because the distributions match so closely, 2024 is an excellent proxy for 2025 behaviour. Models trained on 2024 should not need distribution-shift correction.</div>
+    <div class="finding"><strong>The P99 load is 5.45 kW</strong> — meaning the top 1% of events (peaks) are 3.7× the median. These extremes matter most for grid stability and battery sizing. Our model must handle these peaks well.</div>
+  </div>
+</div>
+
+
+<!-- ─── SECTION 4 ─────────────────────────────────────────────────────────── -->
+<div class="section" id="s4">
+  <div class="section-header"><div class="num">4</div><h2>Plot 3 — Average Hourly Load Profile</h2></div>
+  <div class="section-body">
+    <div class="plot-container">
+      <img src="../plots/03_hourly_load_profile.png" alt="Hourly Load Profile">
+      <div class="plot-caption">Figure 3: Mean and median load by hour of day, with ±1 std shaded band. 2024 (left) and 2025 (right).</div>
+    </div>
+
+    <p>This is one of the most important plots for understanding the household's routine and designing our forecasting features.</p>
+
+    <h3>Overnight Trough (00:00 – 06:00)</h3>
+    <p>Load sits at its lowest: ~0.8–1.1 kW mean, ~0.7 kW median. This is pure baseline consumption — refrigerator, always-on devices, standby power. The narrow confidence band here (low std) means this period is the <strong>most predictable</strong> part of the day.</p>
+
+    <h3>Morning Ramp (06:00 – 10:00)</h3>
+    <p>Load rises steadily as the household wakes up (lights, kettle, cooking, shower). The wide shaded band shows <strong>high variance during this period</strong> — weekdays and weekends behave very differently (earlier on weekdays). This is the hardest period to predict precisely.</p>
+
+    <h3>Midday Peak (10:00 – 14:00) — DOMINANT PEAK</h3>
+    <p>The mean load peaks at <strong>12:45h at ~2.79 kW</strong>. This is unusual for a typical residential profile (which usually peaks in the evening). The reason: this household has significant PV generation, and the midday period corresponds to maximum PV output. The household is likely running high-consumption appliances deliberately during this window to self-consume cheap solar energy (washing machine, dishwasher, cooking). This is a solar-optimised behaviour pattern.</p>
+
+    <h3>Afternoon Dip (14:00 – 18:00)</h3>
+    <p>Load drops sharply after 14:00. The minimum hourly mean occurs around 17:30h at only 0.85 kW. This brief low-load afternoon window is the ideal time to top up the battery cheaply before the evening peak.</p>
+
+    <h3>Evening Activity (18:00 – 23:00)</h3>
+    <p>A secondary rise in the evening as the household becomes active again (cooking dinner, TV, lighting). This peak is lower than the midday peak (~1.5 kW mean at 21:00) but important because <strong>it coincides with high electricity prices and no PV generation</strong> — the worst combination for the bill. This is exactly when the battery should be discharging.</p>
+
+    <div class="finding"><strong>Key insight for forecasting:</strong> The load profile is almost identical between 2024 and 2025, confirming strong temporal consistency. The hourly pattern should be encoded as a circular feature (sin/cos of hour) rather than a raw integer.</div>
+    <div class="finding warning"><strong>Key insight for battery control:</strong> The price-optimal strategy is: charge during 12–14h (PV surplus + cheap prices), discharge during 19–22h (high prices, no PV). Our controller must exploit this window.</div>
+  </div>
+</div>
+
+
+<!-- ─── SECTION 5 ─────────────────────────────────────────────────────────── -->
+<div class="section" id="s5">
+  <div class="section-header"><div class="num">5</div><h2>Plot 4 — Day-of-Week Load Profile</h2></div>
+  <div class="section-body">
+    <div class="plot-container">
+      <img src="../plots/04_dow_load_profile.png" alt="Day of Week Profile">
+      <div class="plot-caption">Figure 4: Mean load by day of week for 2024 and 2025.</div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card"><div class="val">1.497 kW</div><div class="lbl">Weekday avg (2024)</div></div>
+      <div class="stat-card"><div class="val">1.467 kW</div><div class="lbl">Weekend avg (2024)</div></div>
+      <div class="stat-card"><div class="val">0.030 kW</div><div class="lbl">Weekday–Weekend difference</div></div>
+    </div>
+
+    <h3>Interpretation</h3>
+    <p>The day-of-week effect is <strong>surprisingly weak</strong>. The difference between the highest and lowest day is only ~0.08 kW, which is less than 5% of the mean. Weekday load is marginally higher than weekend — the opposite of many households where weekends see more home activity. This is consistent with the midday-peak profile: if the household is optimising around solar self-consumption, the routine is driven by solar availability (which doesn't vary by day of week), not by human schedules.</p>
+    <p>Monday tends to be slightly higher, possibly due to post-weekend wash cycles or appliance backlogs.</p>
+
+    <div class="finding warning"><strong>Modelling implication:</strong> Day-of-week is a <em>weak</em> feature for this dataset. Do not rely on it heavily. It captures less than 1% of variance in load. Including it won't hurt but it won't provide much lift either. The feature importance analysis confirms this (dow ranked 12th out of 14 features).</div>
+  </div>
+</div>
+
+
+<!-- ─── SECTION 6 ─────────────────────────────────────────────────────────── -->
+<div class="section" id="s6">
+  <div class="section-header"><div class="num">6</div><h2>Plot 5 — Monthly Load Profile (Seasonality)</h2></div>
+  <div class="section-body">
+    <div class="plot-container">
+      <img src="../plots/05_monthly_load_profile.png" alt="Monthly Profile">
+      <div class="plot-caption">Figure 5: Mean load by calendar month for 2024 and 2025.</div>
+    </div>
+
+    <h3>Seasonal Pattern</h3>
+    <p>The monthly profile reveals a <strong>U-shaped seasonal pattern</strong>: load is highest in winter (Dec–Jan at ~1.8–2.0 kW mean), lowest in spring/early summer (Apr–May at ~1.2–1.3 kW), and rises again moderately in summer (Jul–Aug at ~1.6 kW). The winter peak is driven by heating, lighting (longer nights), and general indoor activity. The summer rise may reflect cooling (fans/AC) and longer evening activity.</p>
+
+    <p>The lowest months (April–May) correspond to the transition period when neither heating nor cooling is needed, and daylight hours are long. This is when the household is most self-sufficient.</p>
+
+    <h3>2024 vs 2025 Consistency</h3>
+    <p>The monthly profiles track each other closely between years. The seasonal shape is stable — confirming that month-of-year is a reliable feature for forecasting. The 2025 test set only covers January through December but the pattern is consistent.</p>
+
+    <div class="finding"><strong>Modelling implication:</strong> Month should be encoded as a feature. Consider using sin/cos encoding or Fourier terms to represent the smooth annual cycle rather than one-hot encoding the month number.</div>
+  </div>
+</div>
+
+
+<!-- ─── SECTION 7 ─────────────────────────────────────────────────────────── -->
+<div class="section" id="s7">
+  <div class="section-header"><div class="num">7</div><h2>Plot 6 — Load Heatmap: Hour × Day-of-Week</h2></div>
+  <div class="section-body">
+    <div class="plot-container">
+      <img src="../plots/06_load_heatmap_hour_dow.png" alt="Heatmap Hour DOW">
+      <div class="plot-caption">Figure 6: Mean load by every combination of hour (y-axis) and day of week (x-axis).</div>
+    </div>
+
+    <p>This heatmap is critical — it reveals the <strong>interaction between time-of-day and day-of-week</strong>, which a simple average cannot show.</p>
+
+    <h3>What the Colour Map Shows</h3>
+    <p>Dark red = high load (~2.75+ kW mean). Light yellow = low load (~0.75 kW mean). The horizontal dark red band at hours 10–14 confirms the midday peak dominates every single day of the week — there is no day where the midday pattern disappears.</p>
+
+    <h3>Weekday vs Weekend Differences</h3>
+    <p>Looking at Saturday and Sunday: the early morning hours (06:00–09:00) are slightly lighter than weekdays (people sleep in), and the evening activity (20:00–22:00) is slightly higher on weekends. The midday peak, however, is present on all days — again driven by solar-optimised appliance use, not human schedule.</p>
+
+    <h3>Night Hours</h3>
+    <p>Hours 02:00–06:00 are consistently the lightest across all days of the week (pale yellow). This overnight trough is the ideal window for cheap overnight battery charging if prices happen to be low.</p>
+
+    <div class="finding"><strong>Modelling implication:</strong> The interaction term (hour × is_weekend) is worth creating explicitly as a feature. The 10–14h block behaves identically 7 days a week, while early morning and evening show slight weekday/weekend divergence.</div>
+  </div>
+</div>
+
+
+<!-- ─── SECTION 8 ─────────────────────────────────────────────────────────── -->
+<div class="section" id="s8">
+  <div class="section-header"><div class="num">8</div><h2>Plot 7 — Load Heatmap: Hour × Month</h2></div>
+  <div class="section-body">
+    <div class="plot-container">
+      <img src="../plots/07_load_heatmap_hour_month.png" alt="Heatmap Hour Month">
+      <div class="plot-caption">Figure 7: Mean load by hour of day (y-axis) and month of year (x-axis).</div>
+    </div>
+
+    <p>This plot reveals the seasonal evolution of the daily load profile — one of the richest features available for forecasting.</p>
+
+    <h3>Summer vs Winter Morning Pattern</h3>
+    <p>In winter (Dec–Jan), the overnight hours (22:00–06:00) show elevated load (darker colours) compared to summer. This is heating and lighting. The early morning ramp in winter starts heavier.</p>
+
+    <h3>The Midday Block Changes Shape</h3>
+    <p>The dark red midday band (10–14h) is widest and most intense in <strong>June–July</strong>. This is the peak solar season — the household is running more appliances on free solar energy. In January, the midday peak is smaller because PV generates very little, and there is no solar surplus to exploit.</p>
+
+    <h3>Winter Evening Shift</h3>
+    <p>In December and January, the late-night hours (21:00–23:00) are noticeably darker — people are awake longer indoors due to shorter daylight. This creates a strong December/January evening signature that is unique compared to other months.</p>
+
+    <div class="finding"><strong>Modelling implication:</strong> The (hour × month) interaction captures a key pattern that neither variable alone can represent. Consider creating this as an explicit feature, or using an embedding that allows the model to learn seasonal-hourly interactions. This heatmap directly tells you what a good lookup-table baseline model should look like.</div>
+  </div>
+</div>
+
+
+<!-- ─── SECTION 9 ─────────────────────────────────────────────────────────── -->
+<div class="section" id="s9">
+  <div class="section-header"><div class="num">9</div><h2>Plot 8 — Year-over-Year Daily Load Comparison</h2></div>
+  <div class="section-body">
+    <div class="plot-container">
+      <img src="../plots/08_yoy_daily_load.png" alt="Year over Year">
+      <div class="plot-caption">Figure 8: Mean daily load by day-of-year for 2024 (blue) and 2025 (red).</div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card"><div class="val">0.459</div><div class="lbl">2024 vs 2025 daily Pearson r</div></div>
+      <div class="stat-card"><div class="val">−0.014 kW</div><div class="lbl">Mean daily difference (2025−2024)</div></div>
+    </div>
+
+    <h3>Interpretation</h3>
+    <p>The two lines track the same seasonal shape — both dip in spring, rise in summer, dip again in autumn, and rise sharply in winter. However, the day-to-day correlation is 0.46, which is moderate rather than very high. This means <strong>the same day-of-year in a different year does not guarantee the same load</strong> — short-term events (weather, holidays, occupancy) create divergence.</p>
+
+    <p>The mean difference of −0.014 kW (2025 slightly lower) is negligible — effectively the same household consumption level across both years. There is no long-term trend or systematic change in usage habits.</p>
+
+    <h3>High-Volatility Periods</h3>
+    <p>Days 170–200 (mid June–mid July) show the largest divergence between years, likely driven by variable summer weather (cloud cover affecting PV and cooling loads). Winter shows closer tracking.</p>
+
+    <div class="finding warning"><strong>Modelling implication:</strong> The moderate YoY correlation (0.46) means "same day last year" (lag_8760, or lag_35040 in 15-min steps) will be a weaker feature than "same time yesterday" (lag_96). Focus on shorter lags and rolling means rather than same-date-last-year features.</div>
+  </div>
+</div>
+
+
+<!-- ─── SECTION 10 ─────────────────────────────────────────────────────────── -->
+<div class="section" id="s10">
+  <div class="section-header"><div class="num">10</div><h2>Plot 9 — PV Hourly Generation Profile</h2></div>
+  <div class="section-body">
+    <div class="plot-container">
+      <img src="../plots/09_pv_hourly_profile.png" alt="PV Hourly">
+      <div class="plot-caption">Figure 9: Mean (filled area) and maximum (dashed) PV generation by hour of day.</div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card"><div class="val">8.55 kW</div><div class="lbl">Peak PV output (2024)</div></div>
+      <div class="stat-card"><div class="val">2.23 kW</div><div class="lbl">Mean during daylight hours</div></div>
+      <div class="stat-card"><div class="val">52.5%</div><div class="lbl">Zero-generation timesteps</div></div>
+      <div class="stat-card"><div class="val">9,317 kWh</div><div class="lbl">Total PV energy 2024</div></div>
+    </div>
+
+    <h3>Generation Window</h3>
+    <p>PV generation starts around <strong>06:00</strong> and ends around <strong>20:00</strong> (summer window). The maximum average output occurs between 11:00 and 14:00. The bell-shaped curve is characteristic of a south-facing solar panel array in a mid-latitude European location.</p>
+
+    <h3>The Gap Between Mean and Maximum</h3>
+    <p>The wide gap between the mean (filled area) and maximum (dashed line) at peak hours reflects the strong seasonal variation — on a clear summer day at noon the system produces 7–8 kW, but averaging across all days including winter and cloudy days brings this down to ~3 kW mean at noon.</p>
+
+    <h3>Implications for Battery Strategy</h3>
+    <p>The PV profile almost perfectly aligns with the load midday peak. This means during summer, the solar largely self-covers the midday demand, and the battery should be used to shift the remaining surplus to the expensive evening period. During winter, the PV curve flattens dramatically — the battery must be charged from the grid during cheap price windows instead.</p>
+
+    <div class="finding success"><strong>Key asset:</strong> 9,317 kWh of annual PV generation covers 71% of annual load. This is a solar-dominant household. Battery strategy should prioritise PV self-consumption first, then price arbitrage.</div>
+  </div>
+</div>
+
+
+<!-- ─── SECTION 11 ─────────────────────────────────────────────────────────── -->
+<div class="section" id="s11">
+  <div class="section-header"><div class="num">11</div><h2>Plot 10 — PV Monthly Generation Profile</h2></div>
+  <div class="section-body">
+    <div class="plot-container">
+      <img src="../plots/10_pv_monthly_profile.png" alt="PV Monthly">
+      <div class="plot-caption">Figure 10: Mean PV power by calendar month for 2024 and 2025.</div>
+    </div>
+
+    <h3>Seasonal Swing</h3>
+    <p>The monthly PV profile shows a dramatic 10:1 ratio between peak (July: ~2.3 kW mean) and trough (December: ~0.2 kW mean). This is one of the largest sources of non-stationarity in the system — the energy balance, battery behaviour, and grid dependency all change drastically between seasons.</p>
+
+    <p>The system is effectively a <strong>different problem in winter vs summer</strong>: in summer it's a storage and export optimisation problem; in winter it's almost purely a price-arbitrage grid problem.</p>
+
+    <h3>Spring/Autumn Transition Months</h3>
+    <p>March, April, September, and October show intermediate PV (~1.0–1.5 kW mean) with high day-to-day variability driven by cloud cover. These months are the most challenging for the battery controller — the optimal strategy shifts rapidly week-to-week.</p>
+
+    <div class="finding"><strong>Modelling implication:</strong> Month-of-year is a critical conditioning variable for both forecasting and battery control. The model must understand which "solar regime" it is in. Consider separating the training data by season or using month as a strong interaction variable.</div>
+  </div>
+</div>
+
+
+<!-- ─── SECTION 12 ─────────────────────────────────────────────────────────── -->
+<div class="section" id="s12">
+  <div class="section-header"><div class="num">12</div><h2>Plot 11 — Net Load Analysis (Load − PV)</h2></div>
+  <div class="section-body">
+    <div class="plot-container">
+      <img src="../plots/11_net_load.png" alt="Net Load">
+      <div class="plot-caption">Figure 11: Net load (load minus PV) over time. Green = PV surplus periods (export or charge battery). Red = grid import needed.</div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card"><div class="val">71.3%</div><div class="lbl">PV self-sufficiency 2024</div></div>
+      <div class="stat-card"><div class="val">25.6%</div><div class="lbl">Surplus timesteps (PV > Load)</div></div>
+      <div class="stat-card"><div class="val">7.30 kW</div><div class="lbl">Max export surplus 2024</div></div>
+      <div class="stat-card"><div class="val">0.43 kW</div><div class="lbl">Mean net load 2024</div></div>
+    </div>
+
+    <h3>Reading the Plot</h3>
+    <p>The <strong>green area below zero</strong> represents moments when PV generates more than the household consumes — surplus energy that must either charge the battery or be exported to the grid. The <strong>red area above zero</strong> represents times when the household needs more than PV provides — it must either draw from the battery or import from the grid.</p>
+
+    <h3>Seasonal Pattern</h3>
+    <p>In summer (the dense green band in Apr–Aug), the system is in near-constant surplus during daylight hours. In winter, the plot is almost entirely red — the household is a net consumer all day. The boundary months (Mar, Sep-Oct) show rapid alternation between green and red within the same week.</p>
+
+    <h3>Critical Insight for Battery Control</h3>
+    <p>The green surplus is the "free fuel" for the battery. A good controller should capture as much of it as possible. The mean net load of 0.43 kW means that after PV contribution, the household still needs a net 0.43 kW from grid/battery on average — but this is heavily seasonal (winter net ~1.5 kW, summer net ~ −0.5 kW).</p>
+
+    <div class="finding success"><strong>71% self-sufficiency from PV alone</strong> is extremely high. With smart battery management layered on top, we can push toward 85–90%+ self-sufficiency, dramatically reducing grid bills.</div>
+  </div>
+</div>
+
+
+<!-- ─── SECTION 13 ─────────────────────────────────────────────────────────── -->
+<div class="section" id="s13">
+  <div class="section-header"><div class="num">13</div><h2>Plot 12 — Battery &amp; Grid Analysis</h2></div>
+  <div class="section-body">
+    <div class="plot-container">
+      <img src="../plots/12_battery_analysis.png" alt="Battery Analysis">
+      <div class="plot-caption">Figure 12: Battery power (left) and reconstructed State of Charge (right) for 2024 (top) and 2025 (bottom).</div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card"><div class="val">30.6%</div><div class="lbl">Mean SoC 2024</div></div>
+      <div class="stat-card"><div class="val">33.4%</div><div class="lbl">Mean SoC 2025</div></div>
+      <div class="stat-card"><div class="val">15,313</div><div class="lbl">Discharge events 2024</div></div>
+      <div class="stat-card"><div class="val">7,101</div><div class="lbl">Charge events 2024</div></div>
+    </div>
+
+    <h3>Battery Power Pattern (left panels)</h3>
+    <p>The battery power shows active bidirectional operation throughout the year. The existing controller charges (negative values) during PV surplus periods and discharges (positive values) to cover evening load. In 2024, the amplitude of the battery signal is slightly noisier — consistent with the sensor corruption. In 2025, the signal is cleaner with more defined charging/discharging pulses.</p>
+
+    <h3>Reconstructed State of Charge (right panels)</h3>
+    <p>The SoC is computed by integrating battery power over time with 90% round-trip efficiency (√0.90 per direction). The mean SoC of ~30–33% is notably low — the battery spends most of its time in the lower third of its capacity. This suggests the existing controller is somewhat aggressive in discharging (or the battery capacity is undersized for the system's needs).</p>
+    <p>The SoC frequently touches 0% (fully depleted) and rarely reaches 100% (fully charged) — confirming an <strong>aggressive discharge strategy</strong>. A better controller should maintain a strategic buffer (e.g. keep SoC ≥ 20% for forecast uncertainty).</p>
+
+    <div class="finding warning"><strong>Key constraint reminder:</strong> Battery power is limited to ±8 kW, grid to ±6 kW. The data shows actual battery never exceeds ±5.1 kW — either the battery is smaller than 8 kW capacity, or the controller limits it. Our optimisation must respect these constraints hard.</div>
+    <div class="finding danger"><strong>2024 sensor note:</strong> 12,722 idle timesteps (battery_p = 0) in 2024 vs 12,876 in 2025 — similar. But the max imbalance of 0.68 kW in 2024 means some of those readings are simply wrong. Use 2025 data for any battery behaviour analysis; reconstruct 2024 SoC via energy balance.</div>
+  </div>
+</div>
+
+
+<!-- ─── SECTION 14 ─────────────────────────────────────────────────────────── -->
+<div class="section" id="s14">
+  <div class="section-header"><div class="num">14</div><h2>Plot 13 — Electricity Price Analysis</h2></div>
+  <div class="section-body">
+    <div class="plot-container">
+      <img src="../plots/13_price_analysis.png" alt="Price Analysis">
+      <div class="plot-caption">Figure 13: Price distribution, hourly pattern, monthly pattern, and 2024 vs 2025 comparison.</div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card"><div class="val">0.107 €</div><div class="lbl">Mean price 2024 /kWh</div></div>
+      <div class="stat-card"><div class="val">0.116 €</div><div class="lbl">Mean price 2025 /kWh</div></div>
+      <div class="stat-card"><div class="val">0.289 €</div><div class="lbl">Max price /kWh</div></div>
+      <div class="stat-card"><div class="val">711</div><div class="lbl">Price spike events (>P99)</div></div>
+    </div>
+
+    <h3>Distribution (top-left)</h3>
+    <p>The price distribution is roughly bell-shaped, centred around 0.10–0.11 €/kWh, with a long right tail of high-price events up to 0.289 €/kWh. There are also low-price events (near zero), representing times of grid oversupply. The distribution is slightly right-skewed — rare but important high-price spikes create the biggest bill impact.</p>
+
+    <h3>Intraday Price Pattern (top-right) — CRITICAL FOR CONTROLLER</h3>
+    <p>This is the most important panel for the battery controller. The price follows a clear daily cycle:</p>
+    <ul>
+      <li><strong>07:00–09:00:</strong> Morning peak (~0.129 €/kWh) — demand rises as people wake up.</li>
+      <li><strong>12:00–14:00:</strong> Midday trough (~0.091 €/kWh) — national solar generation depresses prices. <span class="tag green">CHARGE HERE</span></li>
+      <li><strong>18:00–20:00:</strong> Evening peak (~0.142 €/kWh) — highest prices of the day as solar falls and demand is high. <span class="tag red">DISCHARGE HERE</span></li>
+      <li><strong>22:00–05:00:</strong> Night baseline (~0.105–0.110 €/kWh) — moderate prices, potential opportunistic charging.</li>
+    </ul>
+    <p>The price spread between cheap midday and expensive evening is ~5 €ct/kWh. For a 10 kWh battery, that represents ~€0.50/day in potential savings from price arbitrage alone — ~€180/year.</p>
+
+    <h3>Monthly Pattern (bottom-left)</h3>
+    <p>Prices are highest in winter (Nov–Jan: ~0.123 €/kWh) and lowest in spring (Apr–May: ~0.094 €/kWh). This mirrors the seasonal imbalance between supply and demand nationally. Winter high prices coincide with low PV — the worst combination, making battery-from-grid charging in cheap windows even more important in winter.</p>
+
+    <h3>2024 vs 2025 (bottom-right)</h3>
+    <p>The 2025 distribution (salmon) is shifted noticeably rightward compared to 2024 (blue). The 2025 mean is 8% higher (0.116 vs 0.107 €/kWh). More importantly, 2025 has a heavier right tail — more high-price events above 0.15 €/kWh. This means the battery is <strong>more valuable in 2025</strong> than 2024, and our controller will be tested against a more expensive price environment.</p>
+
+    <div class="finding"><strong>Price vs Load correlation: −0.003.</strong> Price and load are essentially uncorrelated. This is excellent for the controller — it means we can treat the price signal as an independent input that tells us <em>when</em> to use electricity, separately from the load telling us <em>how much</em> is needed. The two signals do not interfere.</div>
+  </div>
+</div>
+
+
+<!-- ─── SECTION 15 ─────────────────────────────────────────────────────────── -->
+<div class="section" id="s15">
+  <div class="section-header"><div class="num">15</div><h2>Plot 14 — Correlation Matrix</h2></div>
+  <div class="section-body">
+    <div class="plot-container">
+      <img src="../plots/14_correlation_matrix.png" alt="Correlation Matrix">
+      <div class="plot-caption">Figure 14: Pearson correlation between all variables including calendar features.</div>
+    </div>
+
+    <h3>Key Correlations with Load</h3>
+    <ul>
+      <li><strong>grid_p ↔ load_p: +0.46.</strong> Strong positive correlation — more load means more grid import, as expected. However it's not 1.0 because PV and battery partially decouple them.</li>
+      <li><strong>pv_p ↔ load_p: +0.36.</strong> Surprising positive correlation. You might expect PV and load to be independent. The reason: PV correlates with hour-of-day, and so does load. Both peak at midday, creating a spurious positive correlation. This does not mean solar causes load.</li>
+      <li><strong>hour ↔ load_p: +0.08.</strong> Weak linear correlation, because load is non-linear in hour (peak at midday and low at night creates a U-shape, not a line).</li>
+      <li><strong>Selling_price ↔ load_p: −0.003.</strong> Effectively zero. Price does not predict load.</li>
+    </ul>
+
+    <h3>Other Notable Correlations</h3>
+    <ul>
+      <li><strong>pv_p ↔ hour: +0.28.</strong> PV and hour both peak at midday — as expected.</li>
+      <li><strong>grid_p ↔ pv_p: −0.08.</strong> Slight negative — more PV means less grid import. The effect is small because the battery mediates this relationship.</li>
+      <li><strong>price ↔ month: −0.12.</strong> Higher prices in winter months (lower month numbers at start of year).</li>
+    </ul>
+
+    <div class="finding warning"><strong>All correlations with load are weak.</strong> The maximum linear correlation with any single variable is 0.46 (grid_p). This confirms that load forecasting requires non-linear models and temporal features (lags, rolling means) — not simple linear regression on raw inputs.</div>
+  </div>
+</div>
+
+
+<!-- ─── SECTION 16 ─────────────────────────────────────────────────────────── -->
+<div class="section" id="s16">
+  <div class="section-header"><div class="num">16</div><h2>Plot 15 — Load Anomaly Detection</h2></div>
+  <div class="section-body">
+    <div class="plot-container">
+      <img src="../plots/15_load_anomalies.png" alt="Anomalies">
+      <div class="plot-caption">Figure 15: Load time series with statistical anomalies (Z-score > 3) highlighted in red.</div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card"><div class="val">450</div><div class="lbl">Anomalies in 2024 (1.28%)</div></div>
+      <div class="stat-card"><div class="val">343</div><div class="lbl">Anomalies in 2025 (0.98%)</div></div>
+      <div class="stat-card"><div class="val">5.27–9.26 kW</div><div class="lbl">Anomaly range 2024</div></div>
+    </div>
+
+    <h3>What the Anomalies Represent</h3>
+    <p>Red dots mark timesteps where load exceeds 3 standard deviations above the mean (~5.3+ kW). These are not sensor errors — they are <strong>real high-consumption events</strong>: electric vehicle charging, electric oven + other appliances running simultaneously, electric heating at full power, or other high-wattage equipment.</p>
+
+    <h3>Distribution of Anomalies</h3>
+    <p>The anomalies appear scattered throughout the year with no strong seasonal clustering — they represent random high-demand events, not a systematic seasonal effect. About 1% of all timesteps are anomalous. The anomalies skew right (5.27–9.44 kW) — they are all high-consumption outliers, not zero-load anomalies.</p>
+
+    <h3>Implication for Forecasting</h3>
+    <p>These outliers will inflate RMSE disproportionately. A model that predicts the baseline well but misses these spikes will still score poorly on NRMSE. Options: (1) use quantile regression to estimate P90 load and add a buffer, (2) detect likely high-demand periods from context (e.g. pre-weekend, post-holiday), (3) accept the RMSE penalty and focus on getting the average right.</p>
+
+    <div class="finding warning"><strong>Do not remove anomalies from training.</strong> They represent real events that will occur in 2025 too (343 anomalies observed). The model must learn from them. Clipping or removing them would make the model optimistic and hurt test NRMSE.</div>
+  </div>
+</div>
+
+
+<!-- ─── SECTION 17 ─────────────────────────────────────────────────────────── -->
+<div class="section" id="s17">
+  <div class="section-header"><div class="num">17</div><h2>Plot 16 — Autocorrelation (ACF &amp; PACF)</h2></div>
+  <div class="section-body">
+    <div class="plot-container">
+      <img src="../plots/16_autocorrelation.png" alt="Autocorrelation">
+      <div class="plot-caption">Figure 16: Autocorrelation function (left) up to 7-day lag, and Partial ACF (right) up to 100-lag. 2024 (top) and 2025 (bottom).</div>
+    </div>
+
+    <h3>ADF Stationarity Test</h3>
+    <p>Both years pass the Augmented Dickey-Fuller test with p &lt; 0.0001 — the load series is <strong>statistically stationary</strong>. This means the statistical properties (mean, variance) do not drift over time, which simplifies modelling considerably. We do not need differencing or detrending.</p>
+
+    <h3>ACF (left panels)</h3>
+    <p>The ACF shows how correlated the current load is with values at increasing time lags:</p>
+    <ul>
+      <li><strong>Lag 1 (15 min): ACF = 0.816.</strong> Extremely high. The load 15 minutes ago is the single best predictor of current load. This is the dominant short-term inertia.</li>
+      <li><strong>Lag 4 (1 hour): ACF = 0.546.</strong> Still strong. Load an hour ago is highly informative.</li>
+      <li><strong>Lag 96 (24 hours): ACF = 0.445.</strong> Significant daily periodicity — yesterday at the same time is a strong predictor. This is the "daily routine" signal.</li>
+      <li><strong>Lag 192 (48 hours): ACF = 0.416.</strong> The day-before-yesterday signal is almost as strong as yesterday — suggesting the daily pattern is quite consistent day-to-day.</li>
+      <li><strong>Lag 672 (1 week): ACF = 0.407.</strong> The same time last week is still a useful predictor, though slightly weaker than the daily lag.</li>
+    </ul>
+    <p>The ACF decays slowly and never drops to zero within 7 days — indicating <strong>long-range temporal dependencies</strong>. This favours models like LSTM that can maintain memory over long sequences.</p>
+
+    <h3>PACF (right panels)</h3>
+    <p>The PACF drops sharply after lag 1–3, then has isolated spikes at lags 96, 192, 672. This confirms that most of the autocorrelation is explained by the last few values plus the daily/weekly periodicities — which is exactly what our lag features encode.</p>
+
+    <div class="finding success"><strong>Strong, clean autocorrelation structure.</strong> This is a well-behaved time series that responds well to lag-based models. The key lags to include as features: 1, 4, 8, 96, 192, 672 (15min, 1h, 2h, 1day, 2day, 1week).</div>
+  </div>
+</div>
+
+
+<!-- ─── SECTION 18 ─────────────────────────────────────────────────────────── -->
+<div class="section" id="s18">
+  <div class="section-header"><div class="num">18</div><h2>Plot 17 — Spectral Analysis (Periodogram)</h2></div>
+  <div class="section-body">
+    <div class="plot-container">
+      <img src="../plots/17_spectral_analysis.png" alt="Spectral Analysis">
+      <div class="plot-caption">Figure 17: Power spectral density of load. Peaks at 24h and 12h periods are highlighted.</div>
+    </div>
+
+    <h3>What a Periodogram Shows</h3>
+    <p>The periodogram decomposes the load signal into its constituent frequencies. A spike at a particular period means the load systematically repeats at that time scale.</p>
+
+    <h3>Dominant Periods Found</h3>
+    <ul>
+      <li><strong>24 hours:</strong> The strongest periodic component — the daily cycle of human behaviour. Every morning-to-morning rhythm shows up here.</li>
+      <li><strong>12 hours:</strong> The second harmonic of the daily cycle — representing the fact that the daily pattern has two major activity periods (midday peak + evening), creating a 12-hour sub-cycle within each day.</li>
+      <li><strong>8 hours:</strong> A third harmonic, weaker — corresponding roughly to the three activity blocks (morning, afternoon, evening).</li>
+      <li><strong>4,392 hours (~6 months):</strong> The semi-annual component — the U-shaped seasonal pattern (winter–summer–winter) creates a 6-month periodicity.</li>
+      <li><strong>8,784 hours (~1 year):</strong> The annual cycle — confirming that seasonal patterns repeat year-on-year.</li>
+    </ul>
+
+    <div class="finding"><strong>Modelling implication:</strong> The three intraday periods (24h, 12h, 8h) suggest using at least 3 pairs of Fourier features for time-of-day encoding: sin/cos(2π×hour/24), sin/cos(2π×hour/12), sin/cos(2π×hour/8). Combined with the seasonal annual cycle, this gives the model a rich, smooth representation of time.</div>
+  </div>
+</div>
+
+
+<!-- ─── SECTION 19 ─────────────────────────────────────────────────────────── -->
+<div class="section" id="s19">
+  <div class="section-header"><div class="num">19</div><h2>Plot 18 — Feature Importance for Load Forecasting</h2></div>
+  <div class="section-body">
+    <div class="plot-container">
+      <img src="../plots/18_feature_importance.png" alt="Feature Importance">
+      <div class="plot-caption">Figure 18: Feature importances from a quick Random Forest trained on 2024 data. Proxy for relative predictive power.</div>
+    </div>
+
+    <h3>Rankings &amp; Interpretation</h3>
+    <table style="width:100%;border-collapse:collapse;font-size:0.9em;margin:12px 0;">
+      <thead><tr style="background:#0f3460;color:white;"><th style="padding:8px 12px;text-align:left;">Feature</th><th style="padding:8px 12px;text-align:left;">Importance</th><th style="padding:8px 12px;text-align:left;">Meaning</th></tr></thead>
+      <tbody>
+        <tr style="background:#f8fafc;"><td style="padding:8px 12px;font-weight:700;">lag_1</td><td style="padding:8px 12px;color:#0f3460;font-weight:700;">85.7%</td><td style="padding:8px 12px;">Load 15 minutes ago — dominant autoregressive signal</td></tr>
+        <tr><td style="padding:8px 12px;">roll_4_mean</td><td style="padding:8px 12px;">2.2%</td><td style="padding:8px 12px;">1-hour rolling mean — smoothed recent trend</td></tr>
+        <tr style="background:#f8fafc;"><td style="padding:8px 12px;">lag_96</td><td style="padding:8px 12px;">2.0%</td><td style="padding:8px 12px;">Load 24 hours ago — daily routine signal</td></tr>
+        <tr><td style="padding:8px 12px;">pv_lag1</td><td style="padding:8px 12px;">1.6%</td><td style="padding:8px 12px;">PV 15 min ago — solar context signal</td></tr>
+        <tr style="background:#f8fafc;"><td style="padding:8px 12px;">roll_96_mean</td><td style="padding:8px 12px;">1.5%</td><td style="padding:8px 12px;">24-hour rolling mean — daily baseline level</td></tr>
+        <tr><td style="padding:8px 12px;">lag_672</td><td style="padding:8px 12px;">1.5%</td><td style="padding:8px 12px;">Load 1 week ago — weekly seasonality</td></tr>
+        <tr style="background:#f8fafc;"><td style="padding:8px 12px;">lag_192</td><td style="padding:8px 12px;">1.5%</td><td style="padding:8px 12px;">Load 48 hours ago — 2-day memory</td></tr>
+        <tr><td style="padding:8px 12px;">lag_4</td><td style="padding:8px 12px;">1.1%</td><td style="padding:8px 12px;">Load 1 hour ago</td></tr>
+        <tr style="background:#f8fafc;"><td style="padding:8px 12px;">Selling_price</td><td style="padding:8px 12px;">1.0%</td><td style="padding:8px 12px;">Current price — weak signal for load</td></tr>
+        <tr><td style="padding:8px 12px;">hour</td><td style="padding:8px 12px;">0.85%</td><td style="padding:8px 12px;">Hour of day — captured better by lags</td></tr>
+        <tr style="background:#f8fafc;"><td style="padding:8px 12px;">month, dow, minute, is_weekend</td><td style="padding:8px 12px;">&lt;0.3% each</td><td style="padding:8px 12px;">Weak marginal signals</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Critical Observation: lag_1 Dominance</h3>
+    <p>The previous 15-minute reading accounts for 85.7% of the Random Forest's predictive power. This is characteristic of any autoregressive time series — the most recent value is the best single predictor. However, this is somewhat misleading for our use case: we're building a <strong>multi-step ahead forecast</strong> (we need to predict load for the next several hours to make battery decisions). When predicting 4–24 steps ahead, lag_1 is no longer available, and lag_96 (yesterday), lag_672 (last week), and calendar features become much more important.</p>
+
+    <div class="finding warning"><strong>Important caveat:</strong> This feature importance is for a 1-step-ahead prediction. For the rolling-horizon controller (which may need 1–96 step ahead forecasts), the relative importance of lag_96, lag_672, hour, and month will be significantly higher. We must retrain feature importance specifically for the forecast horizon we target.</div>
+  </div>
+</div>
+
+
+<!-- ─── SUMMARY ───────────────────────────────────────────────────────────── -->
+<div class="summary-section" id="summary">
+  <h2>Key Findings &amp; Modelling Strategy</h2>
+
+  <div class="action-grid">
+    <div class="action-card">
+      <h4>Data Quality — All Clear</h4>
+      <ul>
+        <li>Zero missing physical measurements</li>
+        <li>Only 8 missing price values (DST) → forward-fill</li>
+        <li>2024 battery sensor corrupted → use energy balance for SoC</li>
+        <li>Load is stationary — no differencing needed</li>
+        <li>2024 and 2025 distributions nearly identical</li>
+      </ul>
+    </div>
+    <div class="action-card">
+      <h4>Load Behaviour — Key Facts</h4>
+      <ul>
+        <li>Mean 1.49 kW, right-skewed, bimodal distribution</li>
+        <li>Midday peak at 12–13h (solar-optimised household)</li>
+        <li>Secondary evening peak 20–22h (no PV, high price)</li>
+        <li>Very weak day-of-week effect (&lt;5% variance)</li>
+        <li>Strong daily ACF (0.45) and weekly ACF (0.41)</li>
+        <li>Dominant 24h and 12h spectral periods</li>
+      </ul>
+    </div>
+    <div class="action-card">
+      <h4>Energy System Insights</h4>
+      <ul>
+        <li>PV covers 71% of annual load — solar-dominant home</li>
+        <li>25% of timesteps have PV surplus (free battery fuel)</li>
+        <li>Existing controller keeps mean SoC low (30%) — room to improve</li>
+        <li>2025 prices 8% higher than 2024 — controller more valuable</li>
+        <li>Price trough at 12–13h, peak at 19h — clear arbitrage window</li>
+      </ul>
+    </div>
+    <div class="action-card">
+      <h4>Recommended Model Features</h4>
+      <ul>
+        <li>lag_1, lag_4, lag_96, lag_192, lag_672</li>
+        <li>roll_4_mean, roll_96_mean (smoothed trends)</li>
+        <li>Fourier: sin/cos of hour (24h, 12h, 8h cycles)</li>
+        <li>Fourier: sin/cos of day-of-year (annual cycle)</li>
+        <li>hour × month interaction (seasonal-hourly)</li>
+        <li>pv_forecast (if available), or pv_lag1</li>
+      </ul>
+    </div>
+    <div class="action-card">
+      <h4>Forecasting Model Priority</h4>
+      <ul>
+        <li>1st: LightGBM (fast baseline, strong on tabular)</li>
+        <li>2nd: XGBoost (compare vs LightGBM)</li>
+        <li>3rd: LSTM / Transformer (capture long-range ACF)</li>
+        <li>Metric: NRMSE = RMSE / mean(load) × 100</li>
+        <li>Validate: rolling-window CV on 2024</li>
+        <li>Horizon: 1-step → multi-step (recursive or direct)</li>
+      </ul>
+    </div>
+    <div class="action-card">
+      <h4>Battery Controller Priority</h4>
+      <ul>
+        <li>1st: Rule-based (charge at price trough, discharge at peak)</li>
+        <li>2nd: Greedy MPC with load forecast + price lookahead</li>
+        <li>3rd: Full rolling-horizon optimisation (LP/QP)</li>
+        <li>Hard constraints: SoC ∈ [0,1], batt ±8kW, grid ±6kW</li>
+        <li>Efficiency: √0.90 charge and discharge</li>
+        <li>Key window: charge 12–14h, discharge 19–21h</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<footer>Solship Hackathon EDA Report — Generated 2026-05-09 — 18 plots, 70,077 datapoints analysed</footer>
+</body>
+</html>
