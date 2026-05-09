@@ -27,7 +27,7 @@ SUB_PLOTS.mkdir(parents=True, exist_ok=True)
 # ── Load best forecast (walkforward bagging) and actuals ──
 df = pd.read_csv(ROOT / "data/processed/dataset_processed.csv", parse_dates=["timestamp"])
 df_2025 = df[df["timestamp"].dt.year == 2025].copy()
-preds = pd.read_csv(ROOT / "outputs/forecasts/bagging_walkforward_test_preds.csv", parse_dates=["timestamp"])
+preds = pd.read_csv(ROOT / "outputs/forecasts/bagging_walkforward_FINAL_test_preds.csv", parse_dates=["timestamp"])
 
 merged = df_2025[df_2025["timestamp"].dt.month.isin([4, 9])][["timestamp","load_kw","pv_kw","buy_price","sell_price"]].merge(
     preds, on="timestamp", how="left"
@@ -74,7 +74,7 @@ A_per = per_month_bill(baseline_a_bill, df_2025)
 B_per = per_month_bill(baseline_b_bill, df_2025)
 
 # Our MPC: walkforward H=96
-mpc_path = ROOT / "outputs/mpc_walkforward_H96.parquet"
+mpc_path = ROOT / "outputs/mpc_final_H96.parquet"
 mpc_df = pd.read_parquet(mpc_path)
 mpc_per = {}
 for m, n in [(4,"April"),(9,"September")]:
@@ -90,7 +90,7 @@ bill_rows = []
 for label, per in [
     ("Baseline A (existing controller)", A_per),
     ("Baseline B (no battery)",           B_per),
-    ("Our MPC (walkforward bagging, H=96)", mpc_per),
+    ("Our MPC (walkforward bagging light-reg, H=96)", mpc_per),
     ("Oracle (perfect foresight, H=96)",  oracle_per),
 ]:
     a = per["April"]["net_bill"]; s = per["September"]["net_bill"]

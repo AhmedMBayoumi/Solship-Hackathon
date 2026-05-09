@@ -8,18 +8,25 @@
 
 | Metric                                                    | Value          |
 |-----------------------------------------------------------|----------------|
-| **Forecast NRMSE (Apr+Sep 2025)**                         | **61.46 %**    |
-| Forecast RMSE                                             | 0.5538 kW      |
-| Forecast MAE                                              | 0.3303 kW      |
-| Forecast MAPE                                             | 53.73 %        |
-| Forecast R²                                               | 0.714          |
-| **Net bill our MPC (Apr+Sep 2025)**                       | **EUR -18.79** |
+| **Forecast NRMSE (Apr+Sep 2025)**                         | **60.83 %**    |
+| Forecast RMSE                                             | 0.5482 kW      |
+| Forecast MAE                                              | 0.3406 kW      |
+| Forecast MAPE                                             | 58.45 %        |
+| Forecast R²                                               | 0.720          |
+| **Net bill our MPC (Apr+Sep 2025)**                       | **EUR -19.11** |
 | Baseline A bill (existing controller)                     | EUR -7.44      |
-| **Savings vs Baseline A**                                 | **+11.35 EUR (+152.6 %)** |
+| **Savings vs Baseline A**                                 | **+11.67 EUR (+156.9 %)** |
 | Oracle bill (perfect foresight, H=96)                     | EUR -20.15     |
-| Oracle gap                                                | 1.36 EUR       |
+| Oracle gap                                                | 1.04 EUR       |
 
-We are within EUR 1.36 of the theoretical maximum.
+We are within EUR 1.04 of the theoretical maximum.
+
+### Key change vs initial submission
+With supervisor's allowance to include 2024 + 2025-up-to-test-month data,
+we re-tested regularization. Heavy reg (necessary when training was
+2024-only) is now over-restricting. **Light regularization** (num_leaves=63,
+max_depth=8, reg_alpha/lambda=0.1) gave a 0.63 pp NRMSE improvement and
+EUR 0.32 better MPC bill.
 
 ---
 
@@ -68,7 +75,7 @@ submission/
 |---------------------------|------------------------------------------|
 | Loss                      | Huber (alpha=0.9)                        |
 | Trees                     | 3000 per bag                             |
-| Regularization            | heavy: num_leaves 7-63, max_depth 3-6, reg_alpha/lambda 0.5-5, subsample 0.6-0.9 |
+| Regularization            | LIGHT: num_leaves 47-95, max_depth 7-10, reg_alpha 0.05-0.3, reg_lambda 0.1-0.5, subsample 0.85-0.9 |
 | Train data (April model)  | 2024 (all) + 2025 Jan-Feb (val: 2025 Mar)|
 | Train data (Sept model)   | 2024 (all) + 2025 Jan-Aug (val: 2025 last half of Aug) |
 | Features                  | 92 (lags 1..2016, recent-change deltas, rolling 4/8/16/96/384/672 stats, net-load lags, weather + HDD/CDD, Fourier 24h/12h/8h/4h/annual, calendar, tariff_band, holidays) |
@@ -101,7 +108,10 @@ experimental log. Highlights:
 | ML+DL gated fusion (LGBM/XGB/CAT/MLP)      |     62.17 %|
 | ML+DL gated fusion v2 (spike-aware)        |     62.27 %|
 | ML+DL gated fusion v3 (specialists)        |     62.31 %|
-| **Bagging walkforward (THIS SUBMISSION)**  | **61.46 %**|
+| Bagging walkforward (heavy reg, prev)      |     61.46 %|
+| Bagging walkforward + v3 features (132)    |     61.54 %|
+| Bagging walkforward + v4 features (104)    |     61.54 %|
+| **Bagging walkforward + light reg (FINAL)**| **60.83 %**|
 
 Why every approach plateaus at ~62 % for single-residential 15-min:
 - CV = std/mean = 1.15 — std exceeds mean

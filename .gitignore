@@ -9,8 +9,26 @@ dist/
 build/
 .DS_Store
 Thumbs.db
+
+# model artefacts (large)
 outputs/models/*.pkl
 outputs/models/*.pt
 outputs/models/*.h5
+
+# Modal
 *.modal.toml
 .modal.toml
+
+# Archive folders — keep locally for reference, ignore for git
+scripts/_archive/
+modal_scripts/_archive/
+outputs/forecasts/_archive/
+
+# Generated parquets (large) — keep only the final FINAL one
+outputs/mpc_dispatch_H*.parquet
+outputs/mpc_walkforward_H*.parquet
+outputs/oracle_dispatch.parquet
+
+# tmp/scratch
+*.tmp
+*.scratch

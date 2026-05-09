@@ -34,7 +34,7 @@ SUB_PLOTS = SUB / "plots"
 
 df = pd.read_csv(ROOT / "data/processed/dataset_processed.csv", parse_dates=["timestamp"])
 df_2025 = df[df["timestamp"].dt.year == 2025].copy()
-preds = pd.read_csv(ROOT / "outputs/forecasts/bagging_walkforward_test_preds.csv", parse_dates=["timestamp"])
+preds = pd.read_csv(ROOT / "outputs/forecasts/bagging_walkforward_FINAL_test_preds.csv", parse_dates=["timestamp"])
 
 merged = df_2025[df_2025["timestamp"].dt.month.isin([4, 9])][["timestamp","load_kw"]].merge(
     preds, on="timestamp", how="left"
@@ -207,7 +207,7 @@ def per_month_bill(bf, df_):
     return {n: bf(df_[df_["timestamp"].dt.month == m]) for m, n in [(4,"April"),(9,"September")]}
 A_per = per_month_bill(baseline_a_bill, df_2025)
 B_per = per_month_bill(baseline_b_bill, df_2025)
-mpc_df = pd.read_parquet(ROOT / "outputs/mpc_walkforward_H96.parquet")
+mpc_df = pd.read_parquet(ROOT / "outputs/mpc_final_H96.parquet")
 mpc_per = {n: compute_bill(mpc_df[mpc_df["timestamp"].dt.month == m], mpc_df[mpc_df["timestamp"].dt.month == m]["p_grid_kw"]) for m, n in [(4,"April"),(9,"September")]}
 oracle_per = {"April":     {"net_bill": -20.13},
               "September": {"net_bill":  -0.02}}
@@ -221,7 +221,7 @@ A_total = A_per["April"]["net_bill"] + A_per["September"]["net_bill"]
 controllers = [
     ("Baseline A (existing)", A_per["April"]["net_bill"], A_per["September"]["net_bill"]),
     ("Baseline B (no battery)", B_per["April"]["net_bill"], B_per["September"]["net_bill"]),
-    ("Our MPC (walkforward bagging, H=96)", mpc_per["April"]["net_bill"], mpc_per["September"]["net_bill"]),
+    ("Our MPC (walkforward bagging light-reg, H=96)", mpc_per["April"]["net_bill"], mpc_per["September"]["net_bill"]),
     ("Oracle (perfect foresight)", oracle_per["April"]["net_bill"], oracle_per["September"]["net_bill"]),
 ]
 for i, (name, a, s) in enumerate(controllers, start=16):
