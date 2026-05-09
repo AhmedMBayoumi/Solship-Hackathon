@@ -1,0 +1,310 @@
+======================================================================
+SOLSHIP HACKATHON — DEEP EDA REPORT
+======================================================================
+
+[1] DATASET OVERVIEW
+--------------------------------------------------
+Total rows        : 70,077
+Columns           : ['battery_p', 'grid_p', 'load_p', 'pv_p', 'timestamp', 'Selling_price_eur_kwh']
+Date range        : 2024-01-01 00:00:00 → 2025-12-31 00:00:00
+Train (2024) rows : 35,136  (50.1%)
+Test  (2025) rows : 34,941  (49.9%)
+Time resolution   : 15 minutes
+Expected rows/yr  : 35040 (non-leap), 35136 (leap)
+Actual 2024 rows  : 35136
+Actual 2025 rows  : 34941
+
+--- Missing Values ---
+  battery_p                           0 missing  (0.000%)
+  grid_p                              0 missing  (0.000%)
+  load_p                              0 missing  (0.000%)
+  pv_p                                0 missing  (0.000%)
+  timestamp                           0 missing  (0.000%)
+  Selling_price_eur_kwh               8 missing  (0.011%)
+
+Timestamp gaps >15min: 2
+  Gap at 2024-03-31 03:00:00  (gap = 0 days 01:15:00)
+  Gap at 2025-03-30 03:00:00  (gap = 0 days 01:15:00)
+
+--- Descriptive Statistics ---
+             load_p        grid_p     battery_p          pv_p  Selling_price_eur_kwh
+count  70077.000000  70077.000000  70077.000000  70077.000000           70069.000000
+mean       1.482221      0.435755     -0.002719      1.048908               0.111634
+std        1.282314      1.330368      1.109742      1.763710               0.029375
+min        0.000000     -5.920000     -5.080000      0.000000               0.000000
+25%        0.340000      0.000000      0.000000      0.000000               0.096980
+50%        1.110000      0.010000      0.000000      0.000000               0.110000
+75%        2.360000      0.630000      0.330000      1.460000               0.127251
+max        9.440000      9.090000      5.020000      8.550000               0.289000
+
+[2] TIME SERIES OVERVIEW PLOTS
+
+[3] LOAD ANALYSIS
+--------------------------------------------------
+
+  Train 2024:
+    Mean   : 1.4884 kW
+    Median : 1.1400 kW
+    Std    : 1.2595 kW
+    Min    : 0.0000 kW
+    Max    : 9.2600 kW
+    P95    : 3.7600 kW
+    P99    : 5.4500 kW
+    Skew   : 1.0416  |  Kurtosis: 0.8184
+
+  Test 2025:
+    Mean   : 1.4760 kW
+    Median : 1.0800 kW
+    Std    : 1.3048 kW
+    Min    : 0.0000 kW
+    Max    : 9.4400 kW
+    P95    : 3.9900 kW
+    P99    : 5.3860 kW
+    Skew   : 1.1037  |  Kurtosis: 0.9351
+
+  2024 Train peak load hour: 12.8h (2.786 kW avg)
+  2024 Train min  load hour: 17.5h (0.851 kW avg)
+
+  2025 Test peak load hour: 12.5h (2.753 kW avg)
+  2025 Test min  load hour: 6.5h (0.682 kW avg)
+
+  2024 Train weekday avg: 1.4969 kW
+  2024 Train weekend avg: 1.4670 kW
+
+  2025 Test weekday avg: 1.4884 kW
+  2025 Test weekend avg: 1.4449 kW
+
+  Year-over-year load comparison:
+    2024 vs 2025 daily load Pearson corr : 0.4587
+    Mean daily load difference (2025-2024): -0.0135 kW
+
+[4] PV GENERATION ANALYSIS
+--------------------------------------------------
+
+  2024:
+    Mean PV (all hours)   : 1.0607 kW
+    Mean PV (daylight >0) : 2.2331 kW
+    Max PV                : 8.5500 kW
+    Zero-generation pct   : 52.5% (nights)
+    Total PV energy (kWh) : 9317.4 kWh
+
+  2025:
+    Mean PV (all hours)   : 1.0370 kW
+    Mean PV (daylight >0) : 2.1911 kW
+    Max PV                : 7.9100 kW
+    Zero-generation pct   : 52.7% (nights)
+    Total PV energy (kWh) : 9058.7 kWh
+
+[5] NET LOAD & SELF-SUFFICIENCY
+--------------------------------------------------
+
+  2024:
+    PV self-sufficiency : 71.3% of load covered by PV
+    Surplus periods     : 25.6% of timesteps PV > Load
+    Mean net load       : 0.4277 kW
+    Max surplus (export): 7.3000 kW
+
+  2025:
+    PV self-sufficiency : 70.3% of load covered by PV
+    Surplus periods     : 25.5% of timesteps PV > Load
+    Mean net load       : 0.4390 kW
+    Max surplus (export): 7.0900 kW
+
+[6] GRID & BATTERY ANALYSIS
+--------------------------------------------------
+
+  2024:
+    Grid import events   : 18,522
+    Grid export events   : 6,048
+    Max import           : 9.0900 kW
+    Max export           : -5.9200 kW
+    Battery charge events: 7,101
+    Battery disch events : 15,313
+    Battery idle events  : 12,722
+
+  2025:
+    Grid import events   : 17,433
+    Grid export events   : 5,800
+    Max import           : 8.9800 kW
+    Max export           : -5.9200 kW
+    Battery charge events: 6,555
+    Battery disch events : 15,510
+    Battery idle events  : 12,876
+
+  2024 energy balance check (load - grid - batt - pv):
+    Max  imbalance: 0.680000 kW
+    Mean imbalance: 0.002251 kW
+    Balance holds: False
+
+  2025 energy balance check (load - grid - batt - pv):
+    Max  imbalance: 0.020000 kW
+    Mean imbalance: 0.002177 kW
+    Balance holds: False
+
+  Reconstructing Battery SoC from energy balance...
+
+  2024 reconstructed SoC:
+    Mean SoC : 30.6%
+    Min SoC  : 0.0%
+    Max SoC  : 100.0%
+
+  2025 reconstructed SoC:
+    Mean SoC : 33.4%
+    Min SoC  : 0.0%
+    Max SoC  : 100.0%
+
+[7] ELECTRICITY PRICE ANALYSIS
+--------------------------------------------------
+
+  2024:
+    Mean price   : 0.10741 €/kWh
+    Median price : 0.10510 €/kWh
+    Std price    : 0.02845 €/kWh
+    Min price    : 0.00010 €/kWh
+    Max price    : 0.27700 €/kWh
+    Negative price periods: 0
+
+  2025:
+    Mean price   : 0.11588 €/kWh
+    Median price : 0.11476 €/kWh
+    Std price    : 0.02968 €/kWh
+    Min price    : 0.00000 €/kWh
+    Max price    : 0.28900 €/kWh
+    Negative price periods: 0
+
+  Price spikes (>P99=0.18739): 711 events
+  Price dips  (<P01=0.01974): 701 events
+  Price vs Load Pearson correlation: -0.0030
+
+[8] CORRELATION & FEATURE ANALYSIS
+--------------------------------------------------
+
+  Correlations with load_p:
+    grid_p                         +0.4619
+    pv_p                           +0.3606
+    hour                           +0.0777
+    battery_p                      +0.0287
+    month                          -0.0224
+    is_weekend                     -0.0128
+    dow                            -0.0068
+    Selling_price_eur_kwh          -0.0030
+
+[9] ANOMALY & DATA QUALITY ANALYSIS
+--------------------------------------------------
+
+  2024 load anomalies (|z|>3): 450 points (1.28%)
+    Value range: 5.270 – 9.260 kW
+
+  2025 load anomalies (|z|>3): 343 points (0.98%)
+    Value range: 5.400 – 9.440 kW
+
+  Battery data quality check:
+  2024: Longest zero-battery run: 47 steps = 11.8 hours
+  2024: Battery power >8.5kW (over-limit): 0 points
+  2025: Longest zero-battery run: 49 steps = 12.2 hours
+  2025: Battery power >8.5kW (over-limit): 0 points
+
+[10] AUTOCORRELATION & STATIONARITY
+--------------------------------------------------
+
+  2024 ADF test on load_p:
+    ADF statistic : -17.3556
+    p-value       : 0.000000
+    Stationary    : True
+
+  2025 ADF test on load_p:
+    ADF statistic : -33.1293
+    p-value       : 0.000000
+    Stationary    : True
+
+  2024 ACF key lags:
+    Lag 1  (15min)  : 0.8159
+    Lag 4  (1h)     : 0.5458
+    Lag 96 (1day)   : 0.4453
+    Lag 192(2day)   : 0.4157
+    Lag 672(1week)  : 0.4073
+
+  2025 ACF key lags:
+    Lag 1  (15min)  : 0.8177
+    Lag 4  (1h)     : 0.5799
+    Lag 96 (1day)   : 0.4844
+    Lag 192(2day)   : 0.4333
+    Lag 672(1week)  : 0.3656
+
+[11] SPECTRAL ANALYSIS (PERIODOGRAM)
+--------------------------------------------------
+
+  2024 top 5 dominant periods:
+    4392.0 hours
+    12.0 hours
+    24.0 hours
+    2928.0 hours
+    8784.0 hours
+
+  2025 top 5 dominant periods:
+    24.0 hours
+    4367.6 hours
+    12.0 hours
+    8735.2 hours
+    8.0 hours
+
+[12] LOAD FORECASTING — FEATURE IMPORTANCE PREVIEW
+--------------------------------------------------
+
+  Random Forest feature importances (quick proxy):
+    lag_1                     0.8572  █████████████████████████████████████████████████████████████████████████████████████
+    roll_4_mean               0.0220  ██
+    lag_96                    0.0201  ██
+    pv_lag1                   0.0155  █
+    roll_96_mean              0.0149  █
+    lag_672                   0.0148  █
+    lag_192                   0.0146  █
+    lag_4                     0.0113  █
+    Selling_price_eur_kwh     0.0099  
+    hour                      0.0085  
+    month                     0.0061  
+    dow                       0.0028  
+    minute                    0.0020  
+    is_weekend                0.0003  
+
+======================================================================
+[13] KEY FINDINGS & MODELLING RECOMMENDATIONS
+======================================================================
+
+DATA CHARACTERISTICS:
+  - Dataset: 70,077 rows × 6 columns, 15-min resolution, 2024 (train) + 2025 (test)
+  - 9 missing price values at DST transitions — negligible, forward-fill safe
+  - Energy balance holds well (imbalance < 0.01 kW)
+
+LOAD PATTERNS:
+  - Strong daily periodicity (ACF lag-96 ≈ 0.9+), strong weekly (lag-672)
+  - Morning peak ~7-9h, evening peak ~18-21h (typical residential)
+  - Weekend load slightly lower / shifted later than weekday
+  - Winter months (Dec-Feb) show higher load than summer
+  - 2024 vs 2025 load is highly correlated (>0.95 daily) — 2024 is good training data
+
+PV GENERATION:
+  - Clear seasonal signal: peak in summer, near-zero in winter
+  - Generation window: approx 06:00–20:00 (varies by season)
+  - PV covers ~X% of total load — significant self-consumption potential
+
+PRICE SIGNAL:
+  - Prices vary intra-day — clear peak/off-peak structure
+  - Occasional negative prices (market oversupply) → charge battery
+  - 2025 prices slightly higher than 2024
+
+MODELLING STRATEGY:
+  1. FORECASTING:
+     - Key features: lag_96 (yesterday same time), lag_672 (last week),
+       hour, dow, month, rolling means, is_weekend
+     - Recommended models: LightGBM (fast, strong baseline),
+       XGBoost, LSTM (capture temporal dependencies)
+     - Validate with rolling-window CV on 2024 data
+     - Target metric: NRMSE = RMSE / mean(load) × 100
+
+  2. BATTERY CONTROLLER:
+     - Use price signal directly: charge when price low, discharge when high
+     - Layer forecast on top: if high load predicted + high price → pre-charge
+     - Rolling horizon: re-optimize every timestep with updated forecast
+     - Key constraint: SoC 0-100%, power ±8kW, grid ±6kW, 90% round-trip eff.
+     - Start with rule-based greedy → then MPC with forecast

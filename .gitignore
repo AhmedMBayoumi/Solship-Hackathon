@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+*.pyo
+.env
+.venv
+venv/
+*.egg-info/
+dist/
+build/
+.DS_Store
+Thumbs.db
+outputs/models/*.pkl
+outputs/models/*.pt
+outputs/models/*.h5
+*.modal.toml
+.modal.toml
