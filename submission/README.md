@@ -87,21 +87,8 @@ submission/
 | Constraints | Power balance, SoC dynamics with eff=√0.9, |p_bat|≤8, |p_g|≤6, soc∈[0,1] |
 | Wall time   | ~52 s for both Apr+Sep (full month rolling)                |
 
----
 
-## 🔑 Two critical bug fixes that drove the bill from EUR +9 to EUR -19
-
-1. **Grid clamp sign bug** in `mpc_loop.py`: when |p_grid| > 6, we were doing
-   `p_bat -= delta` which made the violation worse and silently broke the
-   energy balance. Fixed to `p_bat += delta`.
-2. **Forecast at k=0**: per the rules, current load is OBSERVED.
-   Was using forecast for the current step. Now the LP horizon's first
-   element is the actual load. This single fix moved bills from
-   EUR +8.38 to EUR -19.16 at H=96.
-
----
-
-## 📊 What we tried (full experimental log)
+## 📊 What I tried (full experimental log)
 
 11 model variants converged to ~62 % NRMSE — see `code/scripts/` and the
 `outputs/reports/training_log.txt` in the parent project for the complete
@@ -148,27 +135,5 @@ python scripts/run_mpc_walkforward.py
 # 5. Build submission spreadsheet + plots
 python scripts/build_submission_xlsx.py
 ```
-
----
-
-## 📐 Battery system constraints (verified)
-
-- Battery: 16 kWh usable, ±8 kW max charge/discharge, round-trip eff 90 %
-- Grid: ±6 kW max import/export
-- SoC reset: 50 % at start of April 1 and September 1 (independent windows)
-- Verified energy balance in saved dispatches: max |error| = 0.0000 kW
-- Verified bound violations: 0 timesteps over |p_bat|≤8, |p_g|≤6, soc∈[0,1]
-
----
-
-## 🌐 Open-Meteo weather
-
-Sondrio (lat 46.17, lon 9.87) historical weather pulled at 15-min
-resolution from `https://archive-api.open-meteo.com/v1/archive`.
-Variables: `temperature_2m`, `shortwave_radiation`, `cloud_cover`,
-`relative_humidity_2m`, plus computed HDD = max(18-T, 0) and
-CDD = max(T-24, 0).
-
----
 
 *Submission ready 2026-05-09.*
