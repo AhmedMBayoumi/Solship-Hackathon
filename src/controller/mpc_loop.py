@@ -27,6 +27,7 @@ def run_mpc(
     soc_init: float = SOC_INIT,
     verbose: bool = True,
     label: str = "",
+    cycle_penalty: float = 0.0,
 ) -> pd.DataFrame:
     """
     Run rolling-horizon MPC on a single month DataFrame.
@@ -49,20 +50,27 @@ def run_mpc(
     soc_list     = []
 
     t0 = time.time()
+    load_actual_arr = df_month["load_kw"].values
     for t in range(n):
         row = df_month.iloc[t]
 
         # ── Get forecast ─────────────────────────────────────────────────
         load_fc = forecast_fn(t, H)                        # shape (H,) or shorter at end
         H_eff   = min(H, n - t)
-        load_fc = np.asarray(load_fc[:H_eff])
+        load_fc = np.asarray(load_fc[:H_eff], dtype=float).copy()
+        # Per hackathon rules: at step t we OBSERVE actual current load.
+        # Replace the first horizon step with the actual measurement so the
+        # current-step decision is not corrupted by forecast noise.
+        if H_eff >= 1:
+            load_fc[0] = float(load_actual_arr[t])
 
         pv_win   = df_month["pv_kw"].values[t : t + H_eff]
         buy_win  = df_month["buy_price"].values[t : t + H_eff]
         sell_win = df_month["sell_price"].values[t : t + H_eff]
 
         # ── Solve LP ─────────────────────────────────────────────────────
-        p_bat, soc_lp = solve_horizon(load_fc, pv_win, buy_win, sell_win, soc, H_eff)
+        p_bat, soc_lp = solve_horizon(load_fc, pv_win, buy_win, sell_win, soc, H_eff,
+                                       cycle_penalty=cycle_penalty)
 
         # ── Enforce physical constraints on executed action ───────────────
         # Clip to battery power limit
@@ -141,6 +149,7 @@ def run_both_months(
     H: int,
     verbose: bool = True,
     label: str = "",
+    cycle_penalty: float = 0.0,
 ) -> tuple[pd.DataFrame, dict]:
     """Run MPC on April 2025 and September 2025 independently (separate SoC resets)."""
     results = []
@@ -150,7 +159,8 @@ def run_both_months(
         df_m = df_2025[df_2025["timestamp"].dt.month == month].copy().reset_index(drop=True)
         forecast_fn = forecast_fn_factory(df_m)
         res, bill = run_mpc(df_m, forecast_fn, H, soc_init=SOC_INIT,
-                            verbose=verbose, label=f"{label} {mname}")
+                            verbose=verbose, label=f"{label} {mname}",
+                            cycle_penalty=cycle_penalty)
         for k in total_bill:
             total_bill[k] = round(total_bill[k] + bill[k], 4)
         results.append(res)

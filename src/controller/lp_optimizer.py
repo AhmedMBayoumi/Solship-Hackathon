@@ -30,6 +30,7 @@ def solve_horizon(
     power_max:  float = POWER_MAX,
     grid_max:   float = GRID_MAX,
     eff:        float = EFF,
+    cycle_penalty: float = 0.0,    # EUR/kWh penalty per kWh charged or discharged
 ) -> tuple:
     """
     Solve LP over H timesteps.
@@ -64,6 +65,9 @@ def solve_horizon(
     for t in range(H):
         c[ii(t)] =  buy_price[t]  * DT   # import cost (positive, minimise)
         c[ie(t)] = -sell_price[t] * DT   # export revenue (negative, minimise neg)
+        if cycle_penalty > 0.0:
+            c[ic(t)] += cycle_penalty * DT   # discourage charging
+            c[id(t)] += cycle_penalty * DT   # discourage discharging
 
     # ── Bounds ───────────────────────────────────────────────────────────
     bounds = (

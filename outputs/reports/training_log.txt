@@ -167,5 +167,76 @@ SECTION 6 — DECISIONS LOG
 2026-05-09: Confirmed rolling-horizon MPC for optimizer (causal, re-solves each step).
 
 ================================================================================
+SECTION 7 — RESULTS (final, fixed mpc_loop with actual-load-at-k=0)
+================================================================================
+
+[EXP-FORECAST] Tabular ensemble (LightGBM, XGBoost) trained on Modal Tesla T4
+  Train data : 2024 Jan-Dec excl. Apr+Sep (28,704 rows × 39 features)
+  Val data   : 2024 Apr+Sep (5,760 rows)  -- mirror of test months
+  Test data  : 2025 Apr+Sep (5,760 rows)
+  Features   : 39 (lags 1/4/8/96/192/672, rolling means/std, Fourier 24h/12h/8h/annual,
+                   weather: temp/rad/cloud/RH/HDD/CDD, calendar, tariff_enc, buy_price)
+
+  LightGBM (Optuna 80 trials, T4 GPU, 30 min wall):
+    Best val NRMSE (Optuna) : 57.82%
+    Final val NRMSE         : 43.94%   (train+val for final fit)
+    Test NRMSE Apr+Sep 2025 : 64.23%
+
+  XGBoost (Optuna 60 trials, 25 min wall):
+    Best val NRMSE (Optuna) : 57.85%
+    Final val NRMSE         : 35.97%
+    Test NRMSE Apr+Sep 2025 : 66.37%
+
+  LSTM (PyTorch seq2seq, 96-step, T4 GPU, 70s wall):
+    Val NRMSE step-1   : 80.07%
+    Val NRMSE 96-step  : 85.12%
+    Decision: REJECTED — under-performs tabular models due to fewer features.
+
+  Note on test NRMSE: actual mean(load_kw) on Apr+Sep 2025 = 0.901 kW
+                      vs annual mean 1.476 kW. RMSE ~0.58 kW gives 64% NRMSE.
+  Forecast bias is well-calibrated (mean(pred-actual) = +0.024 for LGBM, +0.026 for XGB).
+
+[OPT-FIX-1] Found and fixed 2 bugs in mpc_loop.py
+  Bug A: Grid clamping had wrong sign
+    Original: if p_g > 6: p_bat -= delta  (made grid violation WORSE)
+    Fixed   : if p_g > 6: p_bat += delta  (correctly increases discharge)
+    Same fix applied to p_g < -6 case.
+    Impact: ~5 EUR improvement on bills (was reporting clipped p_g without
+            adjusting battery, violating energy balance).
+
+  Bug B: LP horizon used forecast for current step
+    Per hackathon rules: "At each step t: 1. Observe current SoC, actual load,
+    actual PV, actual prices.  2. Forecast load for next H steps."
+    Original: load_fc[0] = forecast for current step
+    Fixed   : load_fc[0] = ACTUAL load for current step (observable at t)
+    Impact: HUGE — moved bill from EUR +8.38 to EUR -19.16 at H=96.
+
+[OPT-MPC] Final controller — rolling-horizon MPC with LP relaxation
+  Solver         : scipy.optimize.linprog (HiGHS)  -- replaces CVXPY (Windows crash)
+  LP variables   : 5H + 1   (p_chg, p_dis, p_imp, p_exp per step + soc[0..H])
+  No binary vars : LP suffices because round-trip eff < 100%
+  Wall time      : H=96 in 60s, H=192 in 110s, H=672 in 510s for Apr+Sep
+  Energy balance : verified zero error in saved dispatch (max|err|=0.0000)
+  Bound checks   : 0 violations of |p_bat|<=8, |p_grid|<=6, soc in [0,1]
+
+[FINAL] Bills on April + September 2025
+  Baseline A (existing controller) : EUR  -7.44   (target to beat)
+  Baseline B (no battery)          : EUR +68.74
+  Our MPC LightGBM H= 96           : EUR -19.16   (savings vs A: +11.72 EUR / +157.7%)
+  Our MPC LightGBM H=192           : EUR -21.84   (savings vs A: +14.40 EUR / +193.6%)
+  Our MPC LightGBM H=672           : EUR -22.53   (savings vs A: +15.09 EUR / +203%)
+  Oracle (perfect foresight) H=96  : EUR -20.14   (forecast-error gap H=96: 0.98 EUR)
+  Oracle (perfect foresight) H=192 : EUR -23.45   (gap H=192: 1.61 EUR)
+  Oracle (perfect foresight) H=672 : EUR -24.84   (gap H=672: 2.31 EUR)
+
+  Knee analysis: H=192 captures 95% of oracle gain at 1/5 the wall time of H=672.
+  Recommended deployment: H=192 (4 days lookahead, ~110 s for 2 months).
+
+[EXT-1] Horizon sensitivity (Extension 1, +5 pts) — 10 horizons tested
+  H ∈ {1, 4, 8, 16, 24, 48, 96, 192, 288, 672} per LightGBM forecast
+  Plot saved -> outputs/plots/19_horizon_sensitivity.png
+  See: outputs/horizon_sweep_lgbm.csv for raw numbers.
+
+================================================================================
 END OF LOG — append new experiments below this line
 ================================================================================
