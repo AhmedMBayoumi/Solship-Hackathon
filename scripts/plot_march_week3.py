@@ -140,7 +140,7 @@ axes[-1].xaxis.set_major_formatter(mdates.DateFormatter("%a %m-%d"))
 axes[-1].set_xlabel("Date")
 
 plt.tight_layout()
-out_dir = ROOT / "outputs/plots"
+out_dir = ROOT / "outputs/plots/dispatch"
 out_dir.mkdir(exist_ok=True)
 out = out_dir / "march_week3_dispatch.png"
 plt.savefig(out, dpi=140, bbox_inches="tight")

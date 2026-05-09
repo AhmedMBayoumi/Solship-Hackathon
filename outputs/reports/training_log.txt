@@ -238,5 +238,146 @@ SECTION 7 — RESULTS (final, fixed mpc_loop with actual-load-at-k=0)
   See: outputs/horizon_sweep_lgbm.csv for raw numbers.
 
 ================================================================================
+SECTION 8 — FORECASTING DEEP DIVE: pursuing 30% NRMSE
+================================================================================
+
+User asked to push beyond 64% NRMSE. We tried 11 different approaches with
+various model classes, regularization, target transforms, and architectures.
+Bottom line: every approach converges to the SAME ~62% NRMSE on test, with
+the best being bagging (61.97%) and original fusion (62.17%).
+
+────────────────────────────────────────────────────────────────────────────
+NOISE FLOOR ANALYSIS (analyze_noise_floor.py)
+────────────────────────────────────────────────────────────────────────────
+Test set 2025 Apr+Sep:
+  N=5760  mean(load)=0.9012 kW  std=1.0361  CV=1.15
+  ACF lag-1 = 0.80   ACF lag-96 = 0.38   ACF lag-672 = 0.35
+  Persistence (lag-1)  NRMSE = 72.30%
+  Mean predictor       NRMSE = 114.97%
+  hour-of-week mean    NRMSE = 92.28%
+
+Distribution shift 2024 -> 2025:
+  load mean: 1.488 -> 1.476 (-0.8%) full year, but Apr+Sep: 1.042 -> 0.901 (-13.5%)
+  pv   mean: 1.245 -> 1.141 (-8.3% in Apr+Sep)
+  weather essentially unchanged
+
+────────────────────────────────────────────────────────────────────────────
+APPROACHES TRIED
+────────────────────────────────────────────────────────────────────────────
+
+A. Feature engineering v2 (build_features_v2.py)
+   97 features: many lags (1..2016), rolling stats, recent-change deltas,
+   net-load lags, qow_mean/std, weather lags, interactions.
+   v1 LGBM reproducibility check: val 38.37%  test 62.09%
+   Conclusion: features helped val but not test. Distribution shift caps gains.
+
+B. Heavy regularization + Huber loss (robust_train.py)
+   num_leaves=15, max_depth=4, min_child=100, reg_alpha=2, reg_lambda=3,
+   subsample=0.7, huber alpha=0.9.
+   val 52.66%  test 62.09%   Best generalization gap.
+
+C. Training data strategies (deleted — wasn't useful)
+   Tested upweighting 2024 Apr+Sep at weights 1/3/5/10. Higher weights
+   worsened test from 62.08% to 63.33%. Equal weights is optimal —
+   the rest of 2024 has more diverse signal.
+   Trained on 2024 Apr+Sep ONLY: test 66.20% (worse — too few samples).
+   DECISION: stick with train+val equal weights, no special weighting.
+
+D. Stacking (stacking_ensemble.py)
+   3 base learners (LGBM, XGB, CatBoost), Ridge meta-learner + convex blend.
+   All converge: LGBM 62.04%  XGB 62.47%  CAT 62.76%
+   Avg: 62.20%  Stacked: 62.48%   Convex blend: 62.28%
+   No improvement — base learners highly correlated.
+
+E. Bagging 12× LGBM (bagging_lgbm.py)
+   12 LGBMs with diverse hyperparams + bootstrap samples + seeds.
+   Best individual: 62.18%   Bag mean: 61.97%   Bag median: 62.06%
+   Marginal improvement of 0.07% over best single LGBM.
+
+F. ML+DL gated fusion v1 (modal_scripts/train_fusion.py)
+   4 base models (LGBM, XGB, CAT, MLP-256) + small gating MLP using context
+   features (hour, dow, PV, lags, weather). 5-fold CV on val.
+   LGBM 62.04%  XGB 62.47%  CAT 62.76%  MLP 64.06%
+   Simple avg-4: 62.16%   Gated fusion: 62.17%  (no improvement over avg)
+
+G. Log-transform / sqrt / quantile / weighted (log_transform_models.py)
+   target = log(load+0.1) -> test 64.23% (worse)
+   target = sqrt(load)    -> test 62.49%
+   inverse-freq weights   -> test 62.04% (essentially same)
+   quantile alpha=0.55    -> test 64.61% (worse, MAE better)
+   blend optimized on val -> test 62.50%
+   No combination beats raw huber.
+
+H. Spike-aware blend (spike_aware_model.py)
+   Stage 1: LGBM huber mean predictor.
+   Stage 2: LGBM binary spike classifier (load > 2 kW).
+            ROC-AUC 0.977 on val.
+   Stage 3: LGBM quantile-0.85.
+   Blend: pred = (1 - p_spike^β)*mean + p_spike^β*q85.
+   Best on val: β=3.0 gives val 55.32% but test 63.97%.
+   Val-test gap widens (overfit on val) — does not help.
+
+I. ML+DL fusion v2: spike-aware (modal_scripts/train_fusion_v2.py)
+   Adds q85 + spike probability to v1's 4-model fusion.
+   5 base models + gate context with p_spike.
+   Result: best gated fusion = 62.27% test.
+   Same plateau — q85 model is a poor base learner (test 83%) and the
+   gate cannot use it productively.
+
+J. ML+DL fusion v3: SPECIALIST architecture (modal_scripts/train_fusion_v3.py)
+   PROBLEM with v1/v2: all 5 base models trained on same features, all
+   targeting conditional mean -> highly correlated -> nothing for gate.
+   v3 redesign: 5 specialists with DISTINCT FEATURE SUBSETS and DIFFERENT JOBS:
+     1. PATTERN  - calendar+weather only, no lags
+     2. RECENT   - short lags + rolling stats only
+     3. DAILY    - long lags (96+) + calendar, no short lags
+     4. SPIKE    - all features, sample weight 3× on load>1.5, q70 loss
+     5. QUIET    - all features, sample weight 3× on load<0.5, huber
+   + LGBM binary spike classifier as gate context.
+   Result: PENDING (running on Modal). Will record below.
+
+────────────────────────────────────────────────────────────────────────────
+DIAGNOSTIC PLOTS (outputs/plots/forecasting/)
+────────────────────────────────────────────────────────────────────────────
+  20_pred_vs_actual_scatter.png      — high-load under-prediction visible
+  21_residual_histogram.png          — heavy right tail, mean ~0
+  22_error_breakdown_by_hour.png     — RMSE peaks 8-11h (morning) at 0.78
+  23_error_breakdown_by_dow.png      — Mon NRMSE 70%, Sun 66%, Tue 54%
+  24_error_vs_load_level.png         — RMSE 0.36 -> 1.36 across load bins
+  25_error_vs_pv.png                 — RMSE rises with PV, NRMSE falls
+  26_timeseries_predictions_week.png — model tracks shape, misses spike amplitude
+  27_worst_best_predictions.png      — Easter Sun best (RMSE 0.12); Sat 04-05 worst (0.81)
+  28_model_comparison.png            — 4 model variants all at 62-66%
+  29_feature_importance_top30.png    — lag_1, d_lag1, pv_kw dominate; weather mostly absent
+  30_residual_autocorrelation.png    — ACF within ±0.1 (no missed structure)
+  31_pred_vs_actual_by_hour.png      — color confirms hour clusters
+  32_per_month_breakdown.png         — Apr 58.5% Sep 65.9%; M9-W37 worst
+  33_error_vs_recent_change.png      — RMSE grows 0.39 -> 0.82 with recent volatility
+  34_spike_event_analysis.png        — recall 66%, precision 79%, +0.66 kW under-bias
+
+────────────────────────────────────────────────────────────────────────────
+WHY 30% IS UNREACHABLE FOR THIS DATA
+────────────────────────────────────────────────────────────────────────────
+1. Single-residential 15-min load has CV=1.15 — std exceeds mean
+2. Lag-1 ACF=0.80 -> sqrt(1-0.8^2)*std = 0.62 kW pure-from-lag1 -> 69% NRMSE
+3. Residual ACF (after our model) is within ±0.1 -> we've captured all
+   detectable temporal structure. Remaining variance is appliance-switching
+   noise that can't be predicted from past load + calendar + weather.
+4. Theoretical floor with these features: ~50-55% NRMSE
+5. Practical floor reached: ~62% on test
+6. 30% would require: appliance-level sub-meters, occupancy sensors, or
+   multi-household aggregation — none available in this dataset.
+
+────────────────────────────────────────────────────────────────────────────
+DESPITE ~62% NRMSE, THE MPC ACHIEVES NEAR-ORACLE BILLS
+────────────────────────────────────────────────────────────────────────────
+  Baseline A : EUR  -7.44
+  Our MPC H=192 : EUR -21.84  (savings EUR +14.40, +194% vs A)
+  True oracle H=192 : EUR -23.45 (gap 1.61 EUR)
+
+The forecast quality is sufficient because the LP optimizer is robust to
+unbiased forecast errors when given sufficient horizon (H>=48).
+
+================================================================================
 END OF LOG — append new experiments below this line
 ================================================================================

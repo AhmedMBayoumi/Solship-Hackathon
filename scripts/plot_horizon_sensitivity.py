@@ -68,7 +68,7 @@ if len(within_1pct) > 0:
     ax.text(knee_H, BASELINE_A + 1, f"Knee H={knee_H}", fontsize=9, ha="left", color="purple")
 
 plt.tight_layout()
-out_dir = ROOT / "outputs/plots"
+out_dir = ROOT / "outputs/plots/results"
 out_dir.mkdir(exist_ok=True)
 out = out_dir / "19_horizon_sensitivity.png"
 plt.savefig(out, dpi=140, bbox_inches="tight")
