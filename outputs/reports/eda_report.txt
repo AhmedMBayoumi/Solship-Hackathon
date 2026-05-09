@@ -308,3 +308,152 @@ MODELLING STRATEGY:
      - Rolling horizon: re-optimize every timestep with updated forecast
      - Key constraint: SoC 0-100%, power ±8kW, grid ±6kW, 90% round-trip eff.
      - Start with rule-based greedy → then MPC with forecast
+
+======================================================================
+[14] NEW FINDINGS FROM HACKATHON BRIEF (POST-EDA UPDATE)
+======================================================================
+
+--- 14.1  CORRECTIONS TO EARLIER ASSUMPTIONS ---
+
+  BATTERY CAPACITY (CORRECTED):
+    - Previously assumed : 10 kWh
+    - Actual value       : 16 kWh  (confirmed in participant brief, page 2)
+    - Impact: SoC reconstructions in sections 6 and 12 used wrong capacity.
+      All future modelling must use 16 kWh. The mean SoC of ~30-33% was
+      computed with 10 kWh — with 16 kWh the actual mean SoC is even lower,
+      meaning the existing controller drains the battery more aggressively
+      than we estimated.
+
+  COLUMN NAMES (CORRECTED):
+    - The raw CSV used non-standard names. Official spec names are:
+        load_p            → load_kw
+        pv_p              → pv_kw
+        battery_p         → p_battery_kw
+        grid_p            → grid_kw
+        Selling_price_eur_kwh → sell_price
+    - All downstream code now uses the official spec names from the
+      processed dataset.
+
+  ENERGY BALANCE CORRUPTION (CLARIFIED):
+    - The brief confirms: the 2025 p_battery_kw column contains a
+      multi-week window with sensor anomalies inconsistent with energy
+      balance. This is the source of the 0.68 kW max imbalance found in
+      section 6.
+    - NOTE: The brief says the corruption is in 2025 — our EDA found the
+      larger imbalance (0.68 kW) in 2024, not 2025 (0.02 kW). This may
+      indicate the corruption window straddles the year boundary, or the
+      brief labelling refers to the optimisation dataset. Either way:
+      reconstruct SoC from energy balance for both years.
+
+--- 14.2  BUY PRICE — MISSING COLUMN DISCOVERED ---
+
+  The raw CSV only contained sell_price (market-based, dynamic).
+  The participant brief reveals a SEPARATE buy price based on the
+  Italian Residential Time-of-Use (TOU) tariff — fixed bands, not dynamic.
+
+  TARIFF STRUCTURE:
+  +--------+------------------+--------------------------------------------------+
+  | Band   | Buy price (€/kWh)| Active hours                                     |
+  +--------+------------------+--------------------------------------------------+
+  | F1     | 0.2540           | Mon–Fri 08:00–19:00 (excl. national holidays)    |
+  | F2     | 0.2682           | Mon–Fri 07–08 & 19–23 | Sat 07:00–23:00 (excl.) |
+  | F3     | 0.2440           | Mon–Sat 00–07 & 23–24 | Sundays | all holidays   |
+  +--------+------------------+--------------------------------------------------+
+
+  KEY INSIGHT — F2 IS THE MOST EXPENSIVE BAND:
+    - F2 (shoulder: early morning + evening + all Saturday daytime) costs
+      MORE than the midday F1 peak. This is counter-intuitive.
+    - The evening window 19:00–23:00 Mon–Fri is F2 (0.2682), not F1.
+    - The most expensive time to draw from grid: Monday–Friday evenings.
+
+  BUY vs SELL PRICE COMPARISON:
+    - Mean buy price  : 0.2529 €/kWh
+    - Mean sell price : 0.1116 €/kWh
+    - Buy/sell ratio  : 2.27×
+    - This means every kWh self-consumed (PV or battery) saves 2.27×
+      more than exporting the same kWh to the grid.
+    - PRIORITY ORDER for battery controller:
+        1. Self-consume PV surplus (avoid buying at 0.25+ €/kWh)
+        2. Discharge during F2 evening (save 0.2682 €/kWh)
+        3. Discharge during F1 daytime (save 0.2540 €/kWh)
+        4. Export surplus at sell price (earn ~0.11 €/kWh) — last resort
+
+  TARIFF BAND DISTRIBUTION (full 2024–2025 dataset):
+    F3 (off-peak) : 31,293 timesteps  (44.7%)
+    F1 (peak)     : 22,176 timesteps  (31.6%)
+    F2 (shoulder) : 16,608 timesteps  (23.7%)
+
+  ITALIAN NATIONAL HOLIDAYS APPLIED (2024 and 2025):
+    Fixed: Jan 1, Jan 6, Apr 25, May 1, Jun 2, Aug 15, Nov 1, Dec 8,
+           Dec 25, Dec 26
+    Easter Monday: Apr 1 2024, Apr 21 2025
+    Total holiday timesteps in dataset: 2,112
+
+--- 14.3  BASELINE BILL COMPUTED (2025, BASELINE A) ---
+
+  Using the actual 2025 p_battery_kw (existing on-site controller):
+    Total 2025 electricity bill : EUR 1,218.97
+    Import cost                 : EUR 1,307.96
+    Export revenue              :  EUR   88.99
+
+  This is the number our controller must beat (Baseline A).
+  The bill objective function:
+    Bill = Σ [ grid_kw(t) × buy_price(t) × 1(import)
+             − |grid_kw(t)| × sell_price(t) × 1(export) ] × 0.25h
+
+--- 14.4  FORECASTING SCOPE CLARIFIED ---
+
+  From the presentation slides (authoritative):
+    - Forecasting metrics (RMSE, MAE, NRMSE) are evaluated on
+      APRIL and SEPTEMBER 2025 only — not the full year.
+    - The controller, however, optimises the full 2025 electricity bill.
+    - A second "surprise" dataset from a different Italian residential
+      site is released on Day 2 at 14:00 for generalization testing.
+      The model must run on it WITHOUT retraining. NRMSE on this dataset
+      counts for 25 pts (same weight as 2025 NRMSE).
+
+  IMPLICATION: Model generalisation matters as much as accuracy.
+    - Avoid overfitting features specific to this household.
+    - Prefer calendar + lag features that generalise to any site.
+    - Do NOT use battery_p or grid_kw as forecast features
+      (they will not be available for a new site).
+
+--- 14.5  PROCESSED DATASET CREATED ---
+
+  File: data/processed/dataset_processed.csv
+  Shape: 70,077 rows × 10 columns
+  Changes vs raw:
+    + buy_price       : Italian TOU tariff band price per timestep
+    + tariff_band     : F1 / F2 / F3 label
+    + is_holiday      : Italian national holiday flag
+    + net_load        : load_kw - pv_kw (derived, always updated)
+    + sell_price ffill: 8 missing values at DST gaps forward-filled
+    - Column names updated to match official hackathon spec
+  Missing values after processing: 0 in all columns
+
+--- 14.6  UPDATED MODELLING STRATEGY ---
+
+  FORECASTING (updated):
+    - Evaluate on April + September 2025 only (per presentation spec)
+    - Add tariff_band and is_holiday as features
+    - Fourier encode hour (24h, 12h, 8h cycles) for generalisation
+    - Must generalise to unseen site — avoid site-specific overfit
+
+  BATTERY CONTROLLER (updated with correct economics):
+    - Objective: minimise bill using buy_price (TOU), not sell_price
+    - Buy/sell asymmetry (2.27×) means self-consumption >> export
+    - Optimal windows:
+        CHARGE:    12:00–14:00 (F1, PV surplus, sell_price low)
+                   OR F3 nights if battery low and forecast shows
+                   expensive F2 evening ahead
+        DISCHARGE: 07:00–08:00 F2 morning (0.2682 €/kWh)
+                   19:00–23:00 F2 evening (0.2682 €/kWh) ← PRIMARY
+                   08:00–19:00 F1 daytime when no PV (0.2540 €/kWh)
+    - Battery capacity: 16 kWh (corrected from 10 kWh)
+    - Efficiency: √0.90 ≈ 0.9487 per direction (charge and discharge)
+    - Hard constraints: SoC ∈ [0%, 100%], battery ±8 kW, grid ±6 kW
+    - Initial SoC for 2025 optimisation: 50% = 8 kWh
+
+======================================================================
+[END OF REPORT — last updated after PDF analysis & data processing]
+======================================================================
