@@ -1,0 +1,171 @@
+================================================================================
+SOLSHIP ENERGY AI HACKATHON — TRAINING LOG
+================================================================================
+Location : Sondrio, Italy
+Scope     : Task 1 (Load Forecasting) + Task 2 (Battery Optimizer)
+Eval      : April 2025 + September 2025 (independent SOC reset at start of each)
+Metric    : NRMSE = RMSE / mean(load) × 100  (lower is better)
+Training  : 2024 data only — 2025 data is FORBIDDEN in training
+Hardware  : Modal.com Tesla T4 GPU
+--------------------------------------------------------------------------------
+
+HOW TO READ THIS LOG
+--------------------
+Each experiment block has:
+  [EXP-###]  Short label
+  Date/Time  When it was run
+  Model      Architecture / algorithm
+  Features   Input feature set used
+  Target     What the model predicts
+  Horizon    Forecast steps ahead (1 step = 15 min)
+  Params     Key hyperparameters
+  Results    RMSE, MAE, NRMSE on validation set
+  Notes      Observations, bugs fixed, plots generated
+  Decision   Keep / Drop / Tune (and why)
+
+================================================================================
+SECTION 1 — BASELINES (reference, no ML)
+================================================================================
+
+[BASELINE-A] Existing on-site controller (actual p_battery_kw from sensor)
+  April 2025  : Import=EUR 100.75  Export=EUR 110.10  Net = EUR -9.35
+  September   : Import=EUR  80.xx  Export=EUR  78.xx  Net = EUR +1.79
+  TOTAL Apr+Sep: EUR -7.57
+  Notes: Controller already earns money in April. September has room to improve.
+
+[BASELINE-B] Zero intelligence (no battery, PV-first, all load met by grid)
+  April 2025  : Net = EUR +XX.XX
+  September   : Net = EUR +XX.XX
+  TOTAL Apr+Sep: EUR +68.74
+  Notes: Without any battery dispatch, bill is EUR 68.74. Baseline A saves ~EUR 76.
+
+--------------------------------------------------------------------------------
+TARGET: Beat Baseline A (EUR -7.57). Every EUR improvement counts for scoring.
+--------------------------------------------------------------------------------
+
+================================================================================
+SECTION 2 — FORECASTING EXPERIMENTS (Task 1)
+================================================================================
+
+[EXP-001]
+  Date      : —
+  Model     : LightGBM (tabular, tree-based)
+  Features  : lag_1, lag_4, lag_96, lag_192, lag_672, hour, dow, month,
+              tariff_band, is_holiday, pv_kw (contemporaneous)
+  Target    : load_kw
+  Horizon   : 1-step (15 min ahead, rolled)
+  Params    : n_estimators=1000, lr=0.05, max_depth=6, num_leaves=63,
+              subsample=0.8, colsample_bytree=0.8, early_stopping=50
+  Val set   : Last 2 weeks of Dec 2024 (held out from 2024 train)
+  Results   :
+    RMSE     = —
+    MAE      = —
+    NRMSE    = —%
+  Notes     : —
+  Decision  : —
+
+[EXP-002]
+  Date      : —
+  Model     : —
+  Features  : —
+  Target    : load_kw
+  Horizon   : —
+  Params    : —
+  Results   :
+    RMSE     = —
+    MAE      = —
+    NRMSE    = —%
+  Notes     : —
+  Decision  : —
+
+================================================================================
+SECTION 3 — OPTIMIZER EXPERIMENTS (Task 2)
+================================================================================
+
+[OPT-001]
+  Date      : —
+  Strategy  : Rolling-horizon MPC (1-step lookahead, greedy)
+  Forecast  : Perfect foresight (oracle test — upper bound)
+  Months    : April 2025, September 2025
+  SOC init  : 50% (8.0 kWh) at start of each month
+  Results   :
+    April net bill   = EUR —
+    September net    = EUR —
+    Combined         = EUR —
+    vs Baseline A    = EUR — improvement
+  Notes     : —
+  Decision  : —
+
+[OPT-002]
+  Date      : —
+  Strategy  : —
+  Forecast  : EXP-00x predictions
+  Results   :
+    April net bill   = EUR —
+    September net    = EUR —
+    Combined         = EUR —
+    vs Baseline A    = EUR — improvement
+  Notes     : —
+  Decision  : —
+
+================================================================================
+SECTION 4 — FEATURE ENGINEERING LOG
+================================================================================
+
+v1 — Initial feature set (created with processed CSV):
+  - lag_1     : load 15 min ago
+  - lag_4     : load 1 hour ago
+  - lag_96    : load 24 hours ago
+  - lag_192   : load 48 hours ago
+  - lag_672   : load 1 week ago
+  - hour      : hour of day (0-23)
+  - dow       : day of week (0=Monday)
+  - month     : month (1-12)
+  - tariff_band : F1/F2/F3 (one-hot or label encoded)
+  - is_holiday  : 0/1 Italian national holiday
+  - pv_kw     : contemporaneous PV generation (known from forecast or actuals)
+
+Candidates to add:
+  - Temperature (Sondrio) from Open-Meteo (free, no API key)
+  - Solar irradiance from Open-Meteo (improves PV forecast, indirectly load)
+  - Rolling mean load (7-day, 1-day)
+  - sin/cos encoding of hour and month (cyclical)
+
+================================================================================
+SECTION 5 — KEY NUMBERS TO REMEMBER
+================================================================================
+
+Battery:
+  Capacity      : 16 kWh
+  Power limit   : ±8 kW (charge/discharge)
+  Grid limit    : ±6 kW (import/export)
+  Efficiency    : √0.90 each direction (round-trip ≈ 90%)
+  SOC init      : 8.0 kWh (50%) at start of each month
+
+Tariff (buy price, Italian TOU):
+  F1 (peak)     : EUR 0.2540/kWh — Mon-Fri 08:00-19:00 (non-holiday)
+  F2 (mid)      : EUR 0.2682/kWh — Mon-Fri 07-08 & 19-23, Sat 07-23 (non-holiday)
+  F3 (off-peak) : EUR 0.2440/kWh — nights (<07:00 & ≥23:00), Sundays, holidays
+  Sell price    : dynamic market price (Selling_price_eur_kwh column)
+
+Dataset:
+  Training      : 2024 full year (35,040 rows at 15-min resolution)
+  Test          : April 2025 + September 2025
+  Timestep      : 15 min → multiply kW × 0.25 for kWh energy
+
+Easter Monday 2025: April 21 → F3 all day (cheap charging opportunity)
+
+================================================================================
+SECTION 6 — DECISIONS LOG
+================================================================================
+
+2026-05-09: Confirmed LightGBM as first forecasting model (fast, tabular-friendly,
+            handles lagged features well, no GPU needed for inference).
+2026-05-09: Confirmed Modal.com for GPU training (Tesla T4, ~$0.59/hr, $30 credit).
+2026-05-09: Confirmed 2024-only training split. Val = last 2 weeks of Dec 2024.
+2026-05-09: Confirmed NRMSE as primary metric. Secondary: MAE, visual residuals.
+2026-05-09: Confirmed rolling-horizon MPC for optimizer (causal, re-solves each step).
+
+================================================================================
+END OF LOG — append new experiments below this line
+================================================================================

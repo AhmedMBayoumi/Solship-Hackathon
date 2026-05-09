@@ -1,0 +1,450 @@
+
+
+############ Solship_Hackathon_Presentation.pdf ############
+
+--- PAGE 1 ---
+E N E R G Y A I
+Registration Form
+HACKATHON 2026
+Zewail City of Science and Technology
+Powered by Solship · Two-Day Competition · 30 Teams
+solship.ai · Energy AI · Battery Optimisation · Load Forecasting
+
+--- PAGE 2 ---
+AB O UT SO L SHIP
+Turning Sustainability
+2×
+into Profitability
+Revenue Increase
+Solship is an AI-driven energy management platform that helps
+businesses with solar PV and battery storage automatically decide
+when to store, buy, or sell electricity — maximising returns from 30% 4 yrs
+every unit of energy generated.
+Cost Savings Payback Period
+Operating in Italy · Backed by PoliHub Milan · Zewail City Partner
+
+--- PAGE 3 ---
+REA L -WORLD TRA CTION
+5
+1 MW
+Pilot Customers Total Installations
+Residential & Commercial/Industrial sites in Italy PV + Battery capacity across active sites
+R Residential C Commercial & Industrial AI AI Optimisation
+6–7 kWp PV · 10–20 kWh battery 40–743 kW PV · 44–130 kWh battery Rolling-horizon MPC deployed
+Milan area & Parma, Italy Mottolini, Autotorino, Fiera Bolzano on every active site
+Backed by PoliHub Milan · Zewail City Partner · Expanding to Egypt 2026
+
+--- PAGE 4 ---
+HOW SOLSHIP WORKS
+01 02 03
+PREDICT OPTIMISE EARN
+Load Forecasting Battery Dispatch Maximised Savings
+Deep learning models ingest historical A rolling-horizon Model Predictive The system automatically arbitrages time-
+consumption, solar generation, Controller solves the optimal of-use tariffs, exports surplus at peak
+temperature, and price signals to forecast charge/discharge schedule every step — prices, and supports grid emergencies for
+load at 15-minute resolution. buying cheap, selling expensive. additional revenue.
+AI sends a signal → Hardware communicates with all inverters → Instant Response
+
+--- PAGE 5 ---
+T H E
+01
+C H A L L E N G E
+Load Forecasting · Battery Dispatch · Rolling MPC
+A real-world energy optimisation problem from an Italian residential site
+
+--- PAGE 6 ---
+PROBLEM OVERVIEW
+Your Mission
+SITE LAYOUT
+You are given a residential site in Italy connected to the utility grid, a 9
+Solar PV
+kWp rooftop solar PV system, and a 16 kWh lithium battery.
+9 kWp
+Build two things:
+Grid
+A load forecasting model
+trained on 2024 data, applied to 2025 6 kW limit
+A rolling-horizon battery
+dispatch controller that cuts the electricity bill
+Battery
+Power Sign Convention
+16 kWh / 8 kW
+VVaarriaiabblele / / S Sigignn MMeaenainnigng
+P_battery < 0 Battery charging
+Load
+P_battery > 0 Battery discharging
+Must be served 100%
+P_grid > 0 Importing from grid
+P_grid < 0 Exporting to grid
+The site load must be fully served at every 15-minute interval without exception
+
+--- PAGE 7 ---
+SYSTEM SPECIFICATIONS
+9 kWp 16 kWh 8 kW
+Solar PV Battery Capacity Max Charge/Discharge
+Peak at STC Usable energy Symmetric limit
+90% 6 kW 50%
+Round-trip Efficiency Grid Connection Initial SoC
+√0.90 per direction Import & export limit Start of 2025 period
+Italian Residential Time-of-Use Tariff
+BBaanndd BuByu yP rPirciece AcAticvteiv Heo Huorsurs
+F1 —Peak € 0.2540/kWh Mon–Fri 08:00–19:00 (excl. holidays)
+F2 —Shoulder € 0.2682/kWh Mon–Fri 07–08 & 19–23 | Sat 07:00–23:00
+F3 —Off-peak € 0.2440/kWh Nights, Sundays & national holidays
+Sell price at each timestep is provided in the dataset · Δt = 0.25 h · All power in kW, energy in kWh
+
+--- PAGE 8 ---
+DATASET & RULES
+Excel file — two sheets: 2024 (training) and 2025 (test)
+CCoolulummnn UUnintit DeDscersicprtiipotnion
+timestamp datetime 15-min interval start, Italian local time (CET/CEST)
+load_kw kW Site electrical load (always ≥ 0)
+pv_kw kW PV generation (zero at night)
+buy_price €/kWh Grid import price (F1/F2/F3 band)
+sell_price €/kWh Grid export price (from market data)
+p_battery_kw kW Actual battery power recorded on site → Baseline A signal
+T R A I N T E S T
+2024 data 2025 data
+Build & tune your Report all metrics &
+forecasting model compute all bills herefor 2 specified months
+Data integrity: A multi-week window in the 2025 p_battery_kw column contains an energy-balance anomaly. Reconstruct SoC from scratch before
+optimising.
+Day 2 —14:00: Surprise dataset from a second residential site released for generalization test
+
+--- PAGE 9 ---
+LOAD FORECASTING
+Train on 2024 data · Forecast April and September 2025 at 15-min resolution · Moving Forecaster -Any algorithm
+RMSE MAE/MAPE NRMSE
+kW kW %
+Root Mean Squared Error Mean Absolute PercentagError RMSE ÷mean(load) ×100
+Penalises large errors more Robust to outliers Primary ranking metric
+Required Required ★Ranking
+Practical Tips
+→ Hour-of-day, day-of-week, month, and holiday flags are effective calendar features
+→ Temperature data (sourced externally) can improve thermally-sensitive load models
+→ Validate on an internal hold-out before ever touching 2025 —no data leakage allowed
+→ Report NRMSE on the Day 2 surprise dataset without retraining —tests generalisation
+NRMSE is the primary ranking metric —it is normalised, so comparable across both sites
+
+--- PAGE 10 ---
+BATTERY DISPATCH CONTROLLER
+ROLLING-HORIZON MPC IS REQUIRED
+A one-shot batch optimisation over the full 2025 year is not acceptable —it violates causality and produces artificially inflated
+savings.
+Objective Function — Minimise Total Electricity Bill:
+Bill = Σ [ P_grid(t) ×buy_price(t) ×𝟙(import) − |P_grid(t)| ×sell_price(t) ×𝟙(export) ] ×Δt
+Hard Constraints
+Grid Power Battery Power State of Charge
+−6 kW ≤ P_grid(t) ≤ 6 kW −8 kW ≤ P_battery(t) ≤ 8 kW 0 ≤ SoC(t) ≤ 1
+MPC or RL accepted · Mandatory: March Week 3 dispatch plot (load / PV / P_battery / P_grid / SoC)
+
+--- PAGE 11 ---
+CHALLENGE STRUCTURE
+CORE TASK — Required for all teams
+Compare your controller's 2025 electricity bill against both
+1 Train a load rolling forecasting model on the 2024 data 4
+baselines
+2 Apply it to generate 2 months in2025 load forecast 5 Report RMSE, MAE/MAPE, and NRMSE on the 2025 test set
+Build a rolling-horizon battery dispatch controller using your Oracle gap: re-run with actual 2025 load as input —report
+3 6
+forecast savings difference in € and %
+EXTENSION 1 — Optional +5 bonus pts
+Horizon sensitivity: run the 2025 optimisation for ≥3 different horizon lengths H (e.g., 1h / 6h / 24h). Report savings vs.
+computation time table. Justify your chosen H.
+Batch static optimisation over the full year is grounds for disqualification
+
+--- PAGE 12 ---
+SCORING & PRIZES
+Controller savings vs. Baseline A
+35 pts 1st
+% savings vs. historical operation on2025
+20,000 EGP
+Forecasting accuracy —NRMSE on2025
+25 pts
+Must report RMSE, MAE, and NRMSE
+2nd
+Generalisation —NRMSE on surprise dataset
+25 pts 10,000 EGP
+NRMSE on Day 2 dataset vs. 2025 baseline
+Reasoning & presentation clarity
+15 pts 3rd
+Quality of design justifications
+5,000 EGP
++ 5 bonus pts for Extension 1 (horizon sensitivity)
+Tiebreaker: (1) controller savings (2) NRMSE surprise dataset (3) NRMSE 2025 test set
+
+--- PAGE 13 ---
+EVENT SCHEDULE
+DAY 1 — Explore · Forecast · Formulate DAY 2 — Optimise · Generalise · Present
+08:30 Registration 09:00 Welcome Remarks —Dr. Ahmed Abdelsamea
+09:00 Welcome Remarks —Dr. Ahmed Abdelsamea 09:30 Hacking Block 3 —Rolling-Horizon Controller
+09:15 Problem Statement Walkthrough 13:00 Lunch & Final Mentor Session
+09:45 Dataset Distribution & Environment Check 14:00 Hacking Block 4 + Surprise Dataset Released
+10:00 Hacking Block 1 —EDA & Load Forecasting 15:00 Final Submission Deadline
+13:00 Lunch & Mentor Office Hours 15:15 Team Presentations (30 teams ×3 min)
+14:00 Hacking Block 2 —Forecasting & Optimizer 17:00 Judging Deliberation
+17:00 Closing Remarks & Day 1 Submission 17:30 Prize Announcement & Closing Ceremony
+Lunch provided both days · AI tools permitted · Venue closes 18:00
+
+--- PAGE 14 ---
+Ready to Optimise?
+Join 30 teams competing to build the best
+AI-powered battery dispatch controller
+WHEN WHERE TEAMS PRIZES
+Two-Day Event Zewail City, Egypt Up to 2 per team 35,000 EGP total
+Powered by Solship · solship.ai · Energy AI · Battery Optimisation
+
+
+
+############ Solship_Participant_Brief_v4.pdf ############
+
+--- PAGE 1 ---
+Energy AI Hackathon 2026 — Participant Problem Statement v4.0
+ENERGY AI HACKATHON 2026
+Participant Problem Statement
+Read this document in full before writing any code. It defines the problem, the dataset, the
+evaluation rules, and what you must present.
+1 Problem Formulation
+You are given a residential site in Italy connected to the utility grid, a rooftop solar PV system, and a
+lithium battery. The site electrical load must be fully served at every 15-minute interval without
+exception.
+At each timestep, energy can come from the grid (purchased at a time-varying buy price), from the
+PV system when generating, or from the battery when discharging. If there is a surplus after the
+load is served, the excess may charge the battery, be exported to the grid at the prevailing sell
+price, or both.
+Your challenge is to build two things: a load forecasting model, and a rolling-horizon battery
+dispatch controller that reduces the site electricity bill compared to the defined baselines.
+Power Sign Convention
+Use these conventions throughout your code, equations, and presentation:
+Variable Sign Meaning
+P_battery Negative (< 0) Battery charging
+P_battery Positive (> 0) Battery discharging
+P_grid Positive (> 0) Importing from grid
+P_grid Negative (< 0) Exporting to grid
+© 2026 Solship. For registered participants only. 1
+
+--- PAGE 2 ---
+Energy AI Hackathon 2026 — Participant Problem Statement v4.0
+2 System Specifications
+Parameter Value Notes
+Solar PV capacity 9 kWp Peak power at standard test conditions
+Battery usable capacity 16 kWh Total usable energy
+Battery max charge / discharge Symmetric limit for charge and
+8 kW
+power discharge
+Battery round-trip efficiency 90 % Apply √0.90 ≈ 0.9487 per direction
+Maximum instantaneous import and
+Grid connection limit 6 kW
+export
+At the start of the 2025 optimization
+Initial battery SoC 50 %
+window
+Italian Residential Time-of-Use Tariff
+Grid electricity follows a three-band residential time-of-use tariff. Buy prices are given below. The
+sell price at each timestep is provided directly in the dataset.
+Band Buy price (€/kWh) Active hours
+F1 0.2540 Mon–Fri 08:00–19:00 (excluding national holidays)
+Mon–Fri 07:00–08:00 and 19:00–23:00 | Saturday 07:00–
+F2 0.2682
+23:00 (excl. holidays)
+Mon–Sat 00:00–07:00 and 23:00–24:00 | Sundays and
+F3 0.2440
+national holidays: all day
+Units
+Power: kW · Energy: kWh · Prices: €/kWh · Cost and savings: € · Time resolution: 15 min (Δt
+= 0.25 h)
+© 2026 Solship. For registered participants only. 2
+
+--- PAGE 3 ---
+Energy AI Hackathon 2026 — Participant Problem Statement v4.0
+3 Dataset
+You receive one Excel file with two sheets — 2024 and 2025 — both at 15-minute resolution. The
+2025 sheet includes the actual battery power recorded on site by the existing controller.
+Column Unit Description
+15-minute interval start, local Italian time
+timestamp datetime
+(CET/CEST)
+load_kw kW Site electrical load (always ≥ 0)
+pv_kw kW PV generation (always ≥ 0; zero at night)
+buy_price €/kWh Grid import price per timestep (F1 / F2 / F3 band)
+sell_price €/kWh Grid export price per timestep (from market data)
+Actual battery power recorded on site. Negative =
+p_battery_kw kW charging, Positive = discharging. This is the
+Baseline A signal.
+Train / Test Split
+• Training: 2024 data. Use this to train and tune your forecasting model.
+• Test and optimization: 2025 data. Report all metrics and compute all electricity bills on 2025
+only. Do not train or tune on 2025.
+Data integrity: The 2025 p_battery_kw column was recorded directly from on-site sensors. A
+multi-week window contains values that are inconsistent with the site energy balance. Before
+building your optimizer, reconstruct the battery SoC trajectory from scratch and verify it is
+physically consistent. Unexplained SoC drift is a sign of corrupted data.
+Day 2 — 13:00: A second load dataset from a different residential site will be released. Run your
+trained forecasting model on it without retraining and report the results.
+© 2026 Solship. For registered participants only. 3
+
+--- PAGE 4 ---
+Energy AI Hackathon 2026 — Participant Problem Statement v4.0
+4 Challenge Structure
+The challenge has one required core task and one optional extension.
+CORE TASK — Required
+1. Train a load forecasting model on the 2024 data.
+2. Apply it to generate a 2025 load forecast.
+3. Build a rolling-horizon battery dispatch controller using your forecast (see Section 7).
+4. Compare your controller’s 2025 electricity bill against both baselines (Section 5).
+5. Report RMSE, MAE, and NRMSE on the 2025 test set.
+6. Oracle gap: re-run your controller with the actual 2025 load values as input (perfect oracle).
+Report oracle savings, forecast-based savings, and the gap in € and %.
+EXTENSION 1 — What is the optimal forecast horizon?
+Run the full 2025 optimization for at least three different horizon lengths H (e.g., 4, 24, and 96
+timesteps — 1 hour, 6 hours, and 24 hours). Report total savings and computation time for
+each.
+What is the minimum horizon needed to capture most of the savings benefit? Is there a point of
+diminishing returns? Justify your chosen H.
+Report: savings vs. horizon table with your recommended H and rationale.
+5 Baselines
+Report savings against both baselines. Both must appear in your final results table.
+Baseline A — Historical Operation
+Compute the 2025 electricity bill using the p_battery_kw column from the dataset. This is exactly
+what the existing on-site controller did. Your controller must beat this — if it does not, the current
+system outperforms your solution.
+Baseline B — Zero-Intelligence
+PV powers the load first at every timestep.
+Surplus (PV > load): exported to the grid at the sell price. Battery not used.
+Deficit (load > PV): bought from the grid at the buy price. Battery not used.
+Battery stays at its initial SoC throughout. No charging or discharging ever occurs.
+Baseline B shows the value of having a controllable battery at all. Baseline A shows the value of a
+smarter controller versus the existing system.
+© 2026 Solship. For registered participants only. 4
+
+--- PAGE 5 ---
+Energy AI Hackathon 2026 — Participant Problem Statement v4.0
+6 Load Forecasting
+Train a model on the 2024 load data and produce a 2025 forecast at 15-minute resolution. You may
+use any algorithm or framework. Forecasting accuracy has a direct financial impact: a better
+forecast enables a more effective controller.
+Evaluation Metrics
+All metrics are computed per 15-minute timestep in kW across the full 2025 period.
+Metric Unit Definition
+Root mean squared error per timestep. Penalises large errors
+RMSE kW
+more than MAE.
+MAE kW Mean absolute error per timestep.
+RMSE ÷ mean(load) × 100. Primary ranking metric —
+NRMSE %
+normalised so results are comparable across sites.
+Report all three metrics for the 2025 test set and for the Day 2 surprise dataset. NRMSE is the
+primary forecasting ranking metric.
+Practical Notes
+• Split 2024 into a training portion and a validation portion before touching 2025 data
+• Residential load has strong daily and weekly seasonality — hour-of-day, day-of-week, month,
+and public holiday flags are effective features
+• Temperature data, if sourced externally, can improve accuracy for thermally-sensitive loads
+• Validate that your train/test split does not leak future information into the model
+7 Battery Dispatch Controller
+Rolling-Horizon Requirement
+Your controller must operate causally: at each decision step it may only use information available
+up to that moment. It looks ahead over a finite forecast horizon H, solves for the optimal dispatch
+over that window, executes only the first decision, then advances one step and repeats.
+© 2026 Solship. For registered participants only. 5
+
+--- PAGE 6 ---
+Energy AI Hackathon 2026 — Participant Problem Statement v4.0
+A one-shot batch optimization over the full 2025 year — where the optimizer simultaneously
+accesses all future load, PV, and price data — is not acceptable. It does not reflect how a real
+controller operates and produces artificially inflated savings figures.
+This type of controller is commonly referred to as Model Predictive Control (MPC). Reinforcement
+Learning (RL) is an alternative framework, though significantly more complex to implement well
+within the hackathon timeframe.
+Objective Function
+At each horizon window, minimise the total electricity bill:
+Bill = Σ [ P_grid(t) × buy_price(t) × 🟩(P_grid > 0) − |P_grid(t)| × sell_price(t) × 🟩(P_grid < 0) ] × Δt
+The first term is the cost of grid imports; the second is revenue from exports. Each applies only when
+P_grid has the corresponding sign.
+Hard Constraints
+• Grid power: −6 kW ≤ P_grid(t) ≤ 6 kW
+• Battery power: −8 kW ≤ P_battery(t) ≤ 8 kW
+• State of charge: 0 ≤ SoC(t) ≤ 1
+Choice of Optimization Method
+You are free to choose how you solve the optimization within each horizon window. Common
+approaches include rule-based heuristics, linear programming (PuLP, CVXPY, SciPy), and mixed-
+integer programming. You will be judged on results and on the clarity of your reasoning for your
+method choice.
+Required Results
+• 2025 electricity bill under Baseline A (historical) and Baseline B (zero-intelligence)
+• 2025 electricity bill under your rolling-horizon controller
+• Absolute savings (€) and percentage savings vs. each baseline
+• Oracle gap: re-run the optimizer with actual 2025 load as input (perfect oracle). Report oracle
+savings, forecast-based savings, and the gap in € and %
+• Dispatch plot for Week 3 of March 2025: load, PV, P_battery, P_grid, and SoC
+The March Week 3 dispatch plot is mandatory. Judges use it to verify that your controller is
+behaving physically correctly and that your reported savings are consistent with the dispatch
+decisions shown.
+© 2026 Solship. For registered participants only. 6
+
+--- PAGE 7 ---
+Energy AI Hackathon 2026 — Participant Problem Statement v4.0
+8 Final Presentation
+Each team presents for exactly 3 minutes. A countdown timer is visible throughout. With 30 teams,
+time is enforced strictly.
+Required Slide Structure (max 6 slides)
+# Topic What judges need to see
+Algorithm and key design choices. RMSE, MAE, and NRMSE
+1 Forecasting model
+on the 2025 test set.
+Optimization method, chosen horizon H, and justification for
+2 Controller approach
+both.
+March Week 3
+3 load, PV, P_battery, P_grid, and SoC for the required week.
+dispatch plot
+Bill: Baseline A, Baseline B, your controller. Absolute (€) and
+4 Results table
+% savings. Oracle gap in € and %. Extension if completed.
+5 Generalization NRMSE on the Day 2 surprise dataset vs. your 2025 result.
+Hardest problem & One specific technical problem you faced and how you
+6
+next steps handled it. What would you improve with one more day?
+Submit slides (PDF or PPTX) and code (ZIP or GitHub link) by 15:00 on Day 2.
+© 2026 Solship. For registered participants only. 7
+
+--- PAGE 8 ---
+Energy AI Hackathon 2026 — Participant Problem Statement v4.0
+9 Scoring & Prizes
+Scores are awarded by the judging panel from the 3-minute presentation. The extension earns
+bonus points above the 100-point base.
+Base Score (100 points)
+Criterion Pts How scored
+Controller savings vs. Baseline A 35 % savings vs. historical operation on 2025.
+Forecasting accuracy — NRMSE
+25 Must report RMSE, MAE, and NRMSE.
+on 2025
+Generalization — NRMSE on
+25 NRMSE on Day 2 dataset vs. 2025 baseline.
+surprise dataset
+Quality of design justifications and ability to
+Reasoning & presentation clarity 15
+explain controller and model decisions.
+TOTAL 100
+Extension Bonus Points
+Extension Bonus Condition
+Extension 1: Horizon sensitivity analysis with ≥3 horizons tested; results
++5
+recommended H tabulated
+Prizes
+Place Prize Criteria
+1st Place 20,000 EGP Highest composite score
+2nd Place 10,000 EGP Second highest composite score
+3rd Place 5,000 EGP Third highest composite score
+Tiebreaker
+© 2026 Solship. For registered participants only. 8
+
+--- PAGE 9 ---
+Energy AI Hackathon 2026 — Participant Problem Statement v4.0
+Ties resolved in order: (1) controller savings, (2) NRMSE on surprise dataset, (3) NRMSE on 2025
+test set. If still tied, judges reach consensus.
+Disqualification
+• Training or tuning the forecasting model on 2025 data
+• Submitting a batch optimizer that accesses full 2025 data simultaneously
+• Failing to submit slides and code by 15:15 on Day 2
+© 2026 Solship. For registered participants only. 9

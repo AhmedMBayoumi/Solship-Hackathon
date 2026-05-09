@@ -1,0 +1,261 @@
+======================================================================
+SOLSHIP HACKATHON 2026 — QUICK REFERENCE GUIDE
+======================================================================
+Read this file whenever you need to remember a rule, formula,
+constraint, or key number without re-reading the full EDA report.
+======================================================================
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. THE PROBLEM IN ONE SENTENCE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Forecast residential load for April + September 2025, then use that
+forecast to control a battery that minimises the electricity bill for
+those same two months. Beat the existing controller (Baseline A).
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2. SITE DETAILS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Location        : Sondrio, Lombardy, Italy (Alpine region)
+Coordinates     : 46.17°N, 9.87°E, elevation ~307m
+Climate         : Continental Alpine — cold winters, warm summers,
+                  high summer irradiance, heavy winter cloud/snow
+PV system       : 9 kWp rooftop (south-facing assumed)
+Battery         : 16 kWh usable, 8 kW max charge/discharge
+Grid connection : 6 kW max import AND export
+Timestep        : 15 minutes (Δt = 0.25 h)
+Time zone       : CET (UTC+1) / CEST (UTC+2) in summer
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+3. SYSTEM CONSTRAINTS — HARD LIMITS (never violate these)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Battery power   : -8 kW  ≤  P_battery  ≤  +8 kW
+                  Negative = charging, Positive = discharging
+Grid power      : -6 kW  ≤  P_grid     ≤  +6 kW
+                  Positive = importing, Negative = exporting
+State of charge : 0%  ≤  SoC  ≤  100%   (i.e. 0 to 16 kWh)
+Load must be served at EVERY timestep without exception.
+Energy balance  : load = grid + battery + pv  (at every step)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+4. BATTERY PHYSICS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Round-trip efficiency : 90%  →  √0.90 ≈ 0.9487 per direction
+Charging   : SoC(t+1) = SoC(t) + |P_battery(t)| × 0.25 × 0.9487  (kWh)
+Discharging: SoC(t+1) = SoC(t) - P_battery(t) × 0.25 / 0.9487    (kWh)
+In percentage: divide kWh by 16 and multiply by 100.
+
+Initial SoC:
+  April 2025     : 50% = 8.0 kWh  at  2025-04-01 00:00
+  September 2025 : 50% = 8.0 kWh  at  2025-09-01 00:00
+  (independent windows — April end-SoC does NOT carry into September)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+5. ELECTRICITY PRICES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SELL PRICE: Dynamic, from market data. In dataset column: sell_price
+  Mean 2024: 0.107 €/kWh   Mean 2025: 0.116 €/kWh   Max: 0.289 €/kWh
+  Intraday pattern: trough at 12-13h (~0.091), peak at 19h (~0.142)
+
+BUY PRICE: Fixed TOU tariff (Italian residential). Column: buy_price
+  ┌────────┬──────────────────┬────────────────────────────────────────────┐
+  │ Band   │ Price (€/kWh)    │ Active Hours                               │
+  ├────────┼──────────────────┼────────────────────────────────────────────┤
+  │ F1     │ 0.2540 (Peak)    │ Mon–Fri 08:00–19:00 (excl. holidays)       │
+  │ F2     │ 0.2682 (Shoulder)│ Mon–Fri 07–08 & 19–23 | Sat 07–23 (excl.) │
+  │ F3     │ 0.2440 (Off-peak)│ Mon–Sat 00–07 & 23–24 | Sun | holidays     │
+  └────────┴──────────────────┴────────────────────────────────────────────┘
+  F2 is the MOST expensive band (shoulder, not peak — remember this!)
+  Buy/sell ratio: 2.27×  →  self-consumption is worth 2.27× more than export
+
+OPTIMAL BATTERY WINDOWS:
+  Charge   : 12–14h (F1, but low sell price = PV surplus is cheap to store)
+             OR F3 nights if price forecast shows expensive F2 ahead
+  Discharge: 07–08h F2 (0.2682 €/kWh, morning shoulder)
+             19–23h F2 (0.2682 €/kWh, evening shoulder) ← PRIMARY TARGET
+             08–19h F1 (0.2540 €/kWh, if battery not needed for F2)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+6. ITALIAN NATIONAL HOLIDAYS (affects tariff band → F3 all day)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Fixed every year:
+  Jan 1   New Year's Day
+  Jan 6   Epiphany
+  Apr 25  Liberation Day
+  May 1   Labour Day
+  Jun 2   Republic Day
+  Aug 15  Assumption (Ferragosto)
+  Nov 1   All Saints' Day
+  Dec 8   Immaculate Conception
+  Dec 25  Christmas Day
+  Dec 26  St. Stephen's Day
+
+Variable (Easter Monday):
+  2024: April 1
+  2025: April 21   ← falls inside our optimization window (April)!
+        April 21 2025 is F3 all day — low buy price, good for charging.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+7. BILL OBJECTIVE FUNCTION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Bill = Σ_t [ P_grid(t) × buy_price(t) × Δt × 𝟙(P_grid > 0)
+           − |P_grid(t)| × sell_price(t) × Δt × 𝟙(P_grid < 0) ]
+
+where Δt = 0.25 h, 𝟙() is the indicator function.
+Lower (more negative) = better. Negative bill = site earns money.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+8. BASELINE BILLS (April + September 2025 — our submission target)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                    April       September   TOTAL
+Baseline A (exist): EUR -9.35   EUR +1.79   EUR -7.57  ← BEAT THIS
+Baseline B (none) : EUR +25.87  EUR +42.87  EUR +68.74
+
+Battery is worth EUR 76.31 over these two months (A vs B).
+We need to go below EUR -7.57 (i.e., even more negative).
+September (EUR +1.79) has more room to improve than April (-9.35).
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+9. FORECASTING RULES & METRICS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Target variable  : load_kw (residential load in kW)
+Train data       : 2024 ONLY — no 2025 data anywhere in training
+Test months      : April 2025 + September 2025
+Validation       : Use 2024 April + September as proxy (best option)
+                   OR walk-forward: train Jan–Sep 2024, val Oct–Dec 2024
+
+Primary metric   : NRMSE = RMSE / mean(load) × 100  [%]
+Also report      : RMSE [kW] and MAE [kW]
+Mean load (2025) : ~1.476 kW  →  NRMSE of 50% ≈ RMSE of 0.738 kW
+
+Day 2 surprise   : Second site dataset released 14:00 Day 2.
+                   Run model WITHOUT retraining. NRMSE counts 25 pts.
+                   Build generalisable features (no site-specific overfit).
+
+KEY FEATURES FOR FORECASTING:
+  Lag features  : lag_1, lag_4, lag_96 (1day), lag_192 (2day), lag_672 (1wk)
+  Rolling means : roll_4_mean, roll_96_mean
+  Fourier time  : sin/cos of hour (24h, 12h, 8h cycles)
+  Fourier season: sin/cos of day-of-year (annual cycle)
+  Calendar      : hour, month, day_of_week, is_weekend, is_holiday
+  Tariff        : tariff_band (F1/F2/F3), buy_price
+  Solar context : pv_kw lagged (pv_lag1)
+  External (opt): temperature for Sondrio from Open-Meteo API
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+10. OPTIMIZER RULES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REQUIRED: Rolling-horizon MPC (causal — no future lookahead beyond H)
+FORBIDDEN: Batch optimizer using all 2025 data at once (disqualification)
+FORBIDDEN: Training on 2025 data
+
+At each step t:
+  1. Observe current SoC, actual load, actual PV, actual prices
+  2. Forecast load for next H steps using your trained model
+  3. Solve optimization over horizon [t, t+H] using forecast + known prices
+  4. Execute ONLY the first decision P_battery(t)
+  5. Advance to t+1, repeat
+
+Horizon sensitivity (Extension 1, +5 pts):
+  Test H = 4 (1h), H = 24 (6h), H = 96 (24h)
+  Report: bill saved and compute time for each H
+  Find: minimum H for diminishing returns
+
+Mandatory plot: Week 3 of March 2025 (load, PV, P_battery, P_grid, SoC)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+11. SCORING (100 base + 5 bonus)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+35 pts  Controller savings vs Baseline A (% savings on Apr+Sep 2025)
+25 pts  Forecasting NRMSE on Apr+Sep 2025
+25 pts  Generalisation NRMSE on Day 2 surprise dataset
+15 pts  Reasoning & presentation clarity
+ 5 pts  Extension 1: horizon sensitivity (≥3 horizons tested)
+
+Tiebreaker order: (1) controller savings, (2) surprise NRMSE, (3) 2025 NRMSE
+
+PRESENTATION: 3 minutes, max 6 slides
+  Slide 1: Forecasting model — algo, RMSE/MAE/NRMSE on 2025
+  Slide 2: Controller — method, horizon H, justification
+  Slide 3: March Week 3 dispatch plot
+  Slide 4: Results table — bills, savings %, oracle gap
+  Slide 5: Generalisation — NRMSE on surprise vs 2025
+  Slide 6: Hardest problem + what you'd improve with more time
+  Submit: slides (PDF/PPTX) + code (ZIP/GitHub) by 15:00 Day 2
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+12. DATA FILES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Raw     : data/raw/ENERGY_Hackathon_DataSet.csv
+          Semicolon-separated, comma decimal. 70,077 rows × 6 cols.
+          Columns: battery_p, grid_p, load_p, pv_p, timestamp,
+                   Selling_price_eur_kwh
+
+Processed: data/processed/dataset_processed.csv
+           Comma-separated, standard floats. 70,077 rows × 10 cols.
+           Columns: timestamp, load_kw, pv_kw, p_battery_kw, grid_kw,
+                    buy_price, sell_price, tariff_band, is_holiday, net_load
+           Use this for ALL modelling. Raw is backup only.
+
+Loading:
+  from src.data.loader import load_train, load_test, load_split
+  train, test = load_split()   # 2024 / 2025
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+13. KEY NUMBERS TO REMEMBER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Battery capacity      : 16 kWh
+Battery max power     : ±8 kW
+Grid max power        : ±6 kW
+Battery efficiency    : √0.90 = 0.9487 per direction
+Initial SoC           : 50% = 8 kWh (each month independently)
+Mean load             : 1.49 kW (2024), 1.48 kW (2025)
+Mean buy price        : 0.253 €/kWh
+Mean sell price       : 0.112 €/kWh
+Buy/sell ratio        : 2.27×
+PV self-sufficiency   : 71% of annual load covered by PV
+Total PV energy (2024): 9,317 kWh
+Baseline A (Apr+Sep)  : EUR -7.57   ← beat this
+Baseline B (Apr+Sep)  : EUR +68.74
+ACF lag-1 (15min)     : 0.82  (most powerful forecast feature)
+ACF lag-96 (1 day)    : 0.45
+ACF lag-672 (1 week)  : 0.41
+Load peak hour        : 12–13h (solar-optimised household)
+Load min hour         : early morning 05–06h
+F2 evening window     : 19:00–23:00 Mon–Fri (most expensive, discharge here)
+Easter Monday 2025    : April 21 (F3 all day — inside our opt window!)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+14. EXTERNAL RESOURCES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PDFs (in resources/pdfs/):
+  - Solship_Participant_Brief_v4.pdf   ← authoritative problem statement
+  - Solship_Hackathon_Presentation.pdf ← slides with scoring and schedule
+
+Open-Meteo (free weather API, no key needed):
+  URL: https://open-meteo.com/
+  Variables to fetch for Sondrio: temperature_2m, shortwave_radiation
+  Lat: 46.17, Lon: 9.87, timezone: Europe/Rome
+
+GitHub repo (private):
+  https://github.com/AhmedMBayoumi/Solship-Hackathon
+
+EDA report (detailed, with all 18 plots):
+  outputs/reports/eda_report.html   (open in browser)
+  outputs/reports/eda_report.txt    (plain text version)
+
+Training log (experiment tracker):
+  outputs/reports/training_log.txt
