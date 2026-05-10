@@ -1,0 +1,58 @@
+
+================================================================================
+DIAGNOSTIC SUMMARY — best forecast (online_retraining, NRMSE 60.65%)
+================================================================================
+
+OVERALL
+  N rows                      : 5760
+  Mean actual load            : 0.9012 kW
+  Std actual load             : 1.0362 kW
+  CV (std/mean)               : 1.150    [>1 means high noise]
+  Combined NRMSE              : 60.65%
+  Combined RMSE               : 0.5465 kW
+  Combined MAE                : 0.3313 kW
+  R²                          : 0.722
+
+WHERE THE MODEL FAILS
+  Worst hour-of-day           : hour  9 (RMSE 0.7911 kW)
+  Best hour-of-day            : hour  1 (RMSE 0.2259 kW)
+  Worst day-of-week           : Mon (NRMSE 67.93%)
+  Largest error overall       : 4.5312 kW at 2025-09-04 08:15:00
+
+HETEROSCEDASTICITY (RMSE vs load level)
+  Load      0-0.5            : RMSE 0.3359 kW   (n=3418.0)
+  Load      0.5-1            : RMSE 0.4010 kW   (n=698.0)
+  Load      1-1.5            : RMSE 0.5538 kW   (n=383.0)
+  Load      1.5-2            : RMSE 0.7016 kW   (n=444.0)
+  Load        2-3            : RMSE 0.8450 kW   (n=534.0)
+  Load         3+            : RMSE 1.3362 kW   (n=283.0)
+
+SPIKE UNDER-PREDICTION
+  High-load rows (>=1.5 kW)   : 1264  (21.9% of test)
+  Under-prediction rate (high): 72.6%   [50% would mean unbiased]
+  Median residual on high     : +0.4089 kW   [positive = systematic under-prediction]
+
+ROOT-CAUSE ANALYSIS
+  1. CV = 1.15 — std exceeds mean. 15-min residential load is heavy-tailed.
+  2. lag-1 ACF ≈ 0.80; the IRREDUCIBLE 1-step floor from lag-1 alone is ~69% NRMSE.
+     Our 60.65% beats that by capturing extra structure from rolling stats / weather.
+  3. Worst regime: high-load periods (>=1.5 kW). RMSE jumps 4.0x
+     vs low-load. These are appliance-switching events that:
+       - happen unpredictably (not in training)
+       - violate the smooth conditional mean the model targets
+  4. Hour  9 is hardest — this is when many simultaneous appliance events occur.
+  5. The remaining variance is appliance-switching noise. To reduce further you need:
+       - sub-meter data per appliance (impossible with current dataset)
+       - aggregate to >5 households (impossible with this site)
+       - 1-hour resolution metric (legal but changes the scoring)
+
+WHAT WE CAN STILL TRY
+  - Asymmetric loss (penalise under-prediction more) — tested, marginal
+  - Ensemble with different seeds — already done (60.80% best)
+  - Spike-detection classifier + amplitude regression — tested, hurt val-test gap
+  - Cooling/heating threshold features (cooling_load_244) — being tested in v6
+  - Italian-pulse features (lunch_peak, tou_shift) — being tested in v6
+  - Wavelet decomposition on recent load — not yet tested (computationally heavy)
+  - Probabilistic forecasting (predict quantiles) — would change what optimizer uses
+
+================================================================================

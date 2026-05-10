@@ -23,6 +23,10 @@ outputs/models/*.h5
 scripts/_archive/
 modal_scripts/_archive/
 outputs/forecasts/_archive/
+outputs/models/_archive/
+outputs/reports/_archive/
+src/features/_archive/
+data/features/_archive/
 
 # Generated parquets (large) — keep only the final FINAL one
 outputs/mpc_dispatch_H*.parquet
@@ -32,3 +36,13 @@ outputs/oracle_dispatch.parquet
 # tmp/scratch
 *.tmp
 *.scratch
+
+# Run logs (large, regenerable)
+outputs/reports/*_run.log
+outputs/reports/*.log
+
+# Feature parquets (regenerable from scripts; keep only the cols .txt manifests)
+data/features/features_v*_all.parquet
+data/features/features_v*_train.parquet
+data/features/features_v*_val.parquet
+data/features/features_v*_test.parquet

@@ -1,0 +1,99 @@
+CONTEXT
+=======
+Problem: 15-min residential load forecasting (Sondrio, Italy, single household).
+Test windows: April 2025 + September 2025.
+Best so far: 60.65% NRMSE (LightGBM walkforward + online retraining, 12 bags).
+Floor: CV(load)=1.15, lag-1 ACF=0.80 → naive lag-1 ≈ 69%, so 60.65% IS already
+hard-won. We've ruled out:
+  - Two-stage spike classifier (61.45%, worse)
+  - Multi-model fusion (gate just picks LGBM)
+  - Chronos zero-shot (76%, much worse)
+  - 60-trial Optuna (61.08%)
+  - v6 Italian behaviour features (60.76%)
+  - v7 causal wavelet decomposition (60.75%)
+  - v8 PCA + autoencoder + FFT representations (61.00%)
+
+THE NEW PROPOSAL (please sanity-check + refine)
+================================================
+The user wants to combine wavelet-domain feature extraction with stacked
+ensembling. Two parallel paths feeding a final DL meta-layer:
+
+PATH A  (wavelet path)
+  step A1: transform load history into wavelet domain (multi-resolution)
+  step A2: extract latent features using EITHER
+           - a pretrained model that works on wavelet/spectral data, OR
+           - an encoder we train from scratch on the wavelet bands
+  step A3: train 8 diverse LGBM bags on those latent features
+  step A4: collect the 8 bag predictions on the test windows
+
+PATH B  (raw path)
+  the 8 bag predictions from path A   +
+  the original tabular features (lags, calendar, weather, PHANN clear-sky,
+  Italian behaviour features, etc.)
+  → flow straight into a final DL meta-layer
+
+FINAL DL META-LAYER
+  takes [8 bag preds]  ⊕  [path-B raw tabular features]
+  → outputs the final 15-min load forecast
+  trained walkforward on a held-out validation window so it learns when to
+  trust the wavelet path vs when to override with raw signals.
+
+YOUR JOB
+========
+Be rigorous and honest. This is a 2-day hackathon, not a research project,
+so we need answers that fit a 1-3 hour implementation budget on a laptop
+(no GPU; Modal credits exhausted).
+
+1. SANITY-CHECK
+   Is this stacked plan likely to beat 60.65% by a meaningful margin
+   (≥1.5pp drop), or is it likely to land in the same 60-61% noise floor
+   we've been hitting? Be specific about WHY.
+
+2. PRETRAINED MODEL ON WAVELET BANDS
+   Are there ANY off-the-shelf pretrained models that take wavelet-band
+   input and output time-series embeddings useful for tabular ML?
+     - WaveNet (audio) — applicable here?
+     - Chronos / TimesFM / Lag-Llama hidden states fed wavelet bands?
+     - 1D-CNN pretrained on UCR archive?
+     - Simple wavelet scattering transform (Bruna & Mallat 2013, kymatio
+       library) — fixed, no training needed?
+   Rank by expected payoff for a single-meter dataset. If "train one
+   yourself" is the right answer, what minimum architecture + training
+   recipe?
+
+3. PATH SPLIT — WHICH FEATURES GO WHERE?
+   We have ~150 features. Help us decide:
+     PATH A (gets wavelet-encoded): which raw columns belong here?
+       e.g., load_kw history, pv_kw, temperature_2m, radiation
+     PATH B (raw, into meta-layer): which features stay tabular?
+       e.g., calendar dummies, holidays, tariff band, Italian behaviour
+       features, clear-sky physics
+   Justify each placement.
+
+4. META-LAYER ARCHITECTURE
+   - small MLP (2-3 layers, 64-128 hidden)?
+   - small Transformer encoder (4 heads, 2 layers)?
+   - LightGBM stacker (no DL at all)?
+   - residual stacker (meta predicts CORRECTION on top of bag mean)?
+   Which has the best ratio of (effort) : (expected gain) given we
+   have 60.65% baseline and want to beat it?
+
+5. WALKFORWARD STACKING — THE LEAKAGE TRAP
+   The classic stacking trap: bags must produce out-of-fold predictions
+   on the meta-layer training set, otherwise the meta-layer just memorises
+   bag overfitting. Given our walkforward setup (April fold trains on
+   2024+Jan-Mar 2025; Sept fold trains on 2024+Jan-Aug 2025), how should
+   we generate out-of-fold bag predictions for the meta-layer's training
+   window without contaminating the test window?
+   Specifically: do we use a sliding inner walkforward, or KFold the
+   training set, or holdout 2025 Jan-Mar as meta-train?
+
+6. CONCRETE CODE
+   Pick the SINGLE highest-leverage variant of this plan and write the
+   skeleton (Python + LightGBM + sklearn + numpy/pywt; no torch unless
+   strictly needed). We will adapt it.
+
+7. BLUNT TAKE
+   If this is wishful thinking and we'd be better off freezing 60.65%
+   and pivoting to MPC bills / surprise dataset / slides, SAY SO.
+   We trust your judgment more than our own at this point.

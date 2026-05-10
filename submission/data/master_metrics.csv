@@ -5,9 +5,9 @@
 
 == FORECAST QUALITY ==
 month,RMSE_kW,MAE_kW,NRMSE_%,R2,n,mean_actual_kW
-April,0.5574,0.344,57.82,0.7623,2880,0.9641
-September,0.5388,0.3372,64.28,0.651,2880,0.8382
-Combined,0.5482,0.3406,60.83,0.7201,5760,0.9012
+April,0.4787,0.285,49.65,0.8247,2880,0.9641
+September,0.4977,0.307,59.38,0.7022,2880,0.8382
+Combined,0.4883,0.296,54.19,0.7779,5760,0.9012
 
 == CONTROLLER BILLS (EUR) ==
 controller,April_import_EUR,April_export_EUR,April_net_EUR,Sept_import_EUR,Sept_export_EUR,Sept_net_EUR,Total_EUR,Savings_vs_A_EUR,Savings_vs_A_pct

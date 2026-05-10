@@ -12,7 +12,7 @@ def fetch_weather(start="2024-01-01", end="2025-12-31") -> pd.DataFrame:
     params = {
         "latitude": LAT, "longitude": LON,
         "start_date": start, "end_date": end,
-        "hourly": "temperature_2m,shortwave_radiation,cloud_cover,relative_humidity_2m,windspeed_10m",
+        "hourly": "temperature_2m,shortwave_radiation,cloud_cover,relative_humidity_2m,windspeed_10m,precipitation,snowfall,weather_code",
         "timezone": "Europe/Rome",
     }
     r = requests.get(url, params=params, timeout=30)
@@ -27,8 +27,22 @@ def fetch_weather(start="2024-01-01", end="2025-12-31") -> pd.DataFrame:
 
 def interpolate_to_15min(df_hourly: pd.DataFrame) -> pd.DataFrame:
     df = df_hourly.set_index("timestamp")
-    df_15 = df.resample("15min").interpolate("linear")
-    df_15 = df_15.reset_index()
+    # Create target index
+    target_idx = pd.date_range(start=df.index.min(), end=df.index.max(), freq="15min")
+    df_15 = df.reindex(target_idx)
+    
+    # Numerical columns to interpolate
+    num_cols = ["temperature_2m", "shortwave_radiation", "cloud_cover", 
+                "relative_humidity_2m", "windspeed_10m", "precipitation", "snowfall"]
+    num_cols = [c for c in num_cols if c in df_15.columns]
+    df_15[num_cols] = df_15[num_cols].interpolate(method="linear")
+    
+    # Categorical columns to ffill
+    cat_cols = ["weather_code"]
+    cat_cols = [c for c in cat_cols if c in df_15.columns]
+    df_15[cat_cols] = df_15[cat_cols].ffill()
+    
+    df_15 = df_15.reset_index().rename(columns={"index": "timestamp"})
     return df_15
 
 
@@ -40,14 +54,9 @@ def add_hdd_cdd(df: pd.DataFrame) -> pd.DataFrame:
 
 
 if __name__ == "__main__":
-    print("Fetching Sondrio weather 2024-2025...")
+    print("Fetching Sondrio weather 2024-2025 (Hourly Raw)...")
     raw = fetch_weather()
-    print(f"  Raw hourly rows: {len(raw)}")
-    df15 = interpolate_to_15min(raw)
-    df15 = add_hdd_cdd(df15)
-    print(f"  15-min rows    : {len(df15)}")
-    print(f"  Columns        : {list(df15.columns)}")
-    df15.to_csv(OUT, index=False)
+    raw = add_hdd_cdd(raw)
+    raw.to_csv(OUT, index=False)
     print(f"  Saved -> {OUT}")
-    print(df15.describe().to_string())
 
