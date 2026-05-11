@@ -1,0 +1,22 @@
+{
+  "baseline_A": {
+    "total": -7.437,
+    "april": -9.2892,
+    "september": 1.8522
+  },
+  "baseline_B": {
+    "total": 68.7389,
+    "april": 25.872,
+    "september": 42.8669
+  },
+  "ours_H96": {
+    "total": -18.8858,
+    "april": -19.6047,
+    "september": 0.7189
+  },
+  "oracle_H96": {
+    "total": -20.1443,
+    "april": -20.1259,
+    "september": -0.0184
+  }
+}

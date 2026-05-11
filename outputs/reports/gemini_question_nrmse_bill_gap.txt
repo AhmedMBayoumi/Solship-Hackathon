@@ -1,0 +1,75 @@
+CONTEXT
+=======
+Solship hackathon — residential battery dispatch optimisation in Sondrio, Italy.
+Test windows: April + September 2025 at 15-min granularity.
+
+THE PROBLEM
+===========
+We have a ~60.4% NRMSE forecast (LightGBM blend) and an MPC controller using
+scipy linprog HiGHS that turns the forecast into battery dispatch decisions.
+We just discovered post-processing trade-offs that don't have an obvious sweet
+spot:
+
+  Forecast variant                    NRMSE       MPC bill (H=96)
+  -------------------                 -----       ---------------
+  raw blend                           60.41%      EUR -18.89  <- best bill
+  symmetric MA(3) smoothed            53.27%
+  smoothed + alpha=1.10 rescale       52.19%      EUR -18.36
+  smoothed + alpha=1.15 rescale       52.26%      EUR -17.93  <- worst bill
+
+So we have a clean MONOTONIC INVERSE relationship: every NRMSE improvement
+from smoothing makes the bill WORSE. The smoothed forecast loses peak-timing
+information the LP needs (it under-charges before high-tariff peaks because
+the smoothed peak looks moderate, not sharp).
+
+WHY IT HAPPENS (our hypothesis)
+================================
+NRMSE is symmetric in errors but the bill is asymmetric:
+- Under-predicting a peak in F1 band (high import tariff) costs a lot
+- Over-predicting a low-load period costs almost nothing
+- LP relies on accurate peak forecasts to pre-charge during F3 (cheap)
+- Smoothing drops the peak forecast amplitude, so LP under-charges
+
+THE QUESTIONS
+=============
+
+1. Is there a known POST-PROCESSING technique that improves BOTH NRMSE AND
+   the dispatch bill simultaneously? Specifically a transformation
+   T: raw_forecast -> better_forecast
+   that preserves peak timing/sharpness while reducing low-load noise.
+   Some candidates we are considering:
+
+   a. Adaptive smoothing — smooth only flat periods, keep peaks sharp
+      (e.g. apply MA only when local std < threshold)
+   b. Wavelet shrinkage — denoise high-frequency noise but preserve sharp
+      transients (Donoho-Johnstone soft thresholding)
+   c. Quantile-conditional rescaling — different alpha for high vs low
+      forecast values (e.g. alpha_high=1.2 for top decile, alpha_low=1.0)
+   d. Tariff-band-aware smoothing — heavier smoothing during F3, lighter
+      during F1 (where bills are sensitive)
+   e. Conformal prediction with asymmetric coverage — replace point forecast
+      with an upper quantile (e.g. q=0.6) that under-predicts less
+   f. Bilateral filtering — preserve edges, smooth flat regions (image
+      processing trick adapted to time series)
+
+   Rank these for a 2-day hackathon with 1-2 hours implementation budget.
+   No retraining, just post-processing of the existing CSV.
+
+2. Is there a "decision-focused" loss formulation that we can mimic with
+   post-processing? E.g. Donti, Amos, Kolter 2017 "Task-Based End-to-End
+   Model Learning". Without retraining the model, can we approximate this
+   with a transform of the predictions?
+
+3. Counter-question: is it provably IMPOSSIBLE to improve both NRMSE AND
+   bill simultaneously with a content-preserving transform? Would the
+   only viable path be to accept the bias (over-predict peaks systematically)
+   and pay an NRMSE penalty for a bill gain? In that case, what's the
+   EXPECTED Pareto frontier shape? Can we go in the OPPOSITE direction —
+   add noise / spikes to the forecast to help the LP make better decisions?
+
+4. Cite specific papers / techniques you actually know exist (not guesses).
+   Tell us straight if there's no good answer.
+
+5. Concrete code suggestion for the highest-leverage technique you pick.
+
+Be rigorous. We trust your honesty more than our own at this point.

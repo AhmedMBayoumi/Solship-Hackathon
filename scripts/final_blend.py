@@ -47,12 +47,25 @@ def load_pred(name, path):
         merged["load_pred"] = merged["load_pred"].ffill().bfill()
     return merged["load_pred"].values
 
-models = {
-    "online_retraining": load_pred("online_retraining", "online_retraining_test_preds.csv"),
-    "v10_lstm_ae"      : load_pred("v10_lstm_ae",       "v10_lstm_ae_test_preds.csv"),
-    "v9_stacked"       : load_pred("v9_stacked",        "v9_stacked_test_preds.csv"),
-    "bagging_FINAL"    : load_pred("bagging_FINAL",     "bagging_walkforward_FINAL_test_preds.csv"),
+def safe_load(name, path):
+    p = F / path
+    if not p.exists():
+        # check archive
+        p_arc = F / "_archive" / path
+        if p_arc.exists():
+            return load_pred(name, f"_archive/{path}")
+        print(f"  SKIP {name}: file missing"); return None
+    return load_pred(name, path)
+
+models_raw = {
+    "online_retraining"     : safe_load("online_retraining",      "online_retraining_test_preds.csv"),
+    "online_retraining_v12" : safe_load("online_retraining_v12",  "online_retraining_v12_test_preds.csv"),
+    "v10_lstm_ae"           : safe_load("v10_lstm_ae",            "v10_lstm_ae_test_preds.csv"),
+    "v10_v12_lstm_ae"       : safe_load("v10_v12_lstm_ae",        "v10_v12_lstm_ae_test_preds.csv"),
+    "v11_lstm_ae_v2"        : safe_load("v11_lstm_ae_v2",         "v11_lstm_ae_v2_test_preds.csv"),
+    "bagging_FINAL"         : safe_load("bagging_FINAL",          "bagging_walkforward_FINAL_test_preds.csv"),
 }
+models = {k: v for k, v in models_raw.items() if v is not None}
 
 y = actuals["load_kw"].values
 def nrmse(p): return float(np.sqrt(np.mean((y-p)**2)) / np.mean(y) * 100)

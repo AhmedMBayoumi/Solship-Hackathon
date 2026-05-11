@@ -25,6 +25,7 @@ modal_scripts/_archive/
 outputs/forecasts/_archive/
 outputs/models/_archive/
 outputs/reports/_archive/
+outputs/_archive/
 src/features/_archive/
 data/features/_archive/
 
